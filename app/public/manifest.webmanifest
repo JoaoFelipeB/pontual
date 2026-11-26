@@ -1,0 +1,9 @@
+{
+  "name": "VetCare — Agenda veterinária",
+  "short_name": "VetCare",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F5F6F8",
+  "theme_color": "#0B5C63",
+  "icons": [{ "src": "logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

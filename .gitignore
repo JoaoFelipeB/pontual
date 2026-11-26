@@ -1,0 +1,9 @@
+node_modules
+app/dist
+app/.env
+app/android/app/build
+app/android/.gradle
+app/android/build
+*.apk
+app/android/app/src/main/assets/public
+app/android/app/src/main/assets/capacitor*.json
