@@ -1,0 +1,29 @@
+# Run once: applies the app name "Pontual - Sistema para Clínicas" to the front-end files.
+name: Aplicar nome Pontual (uso único)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  brand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rename app
+        run: |
+          set -e
+          sed -i 's#<title>VetCare</title>#<title>Pontual - Sistema para Clínicas</title>#' app/index.html
+          sed -i 's#"name": "VetCare — Agenda veterinária"#"name": "Pontual - Sistema para Clínicas"#; s#"short_name": "VetCare"#"short_name": "Pontual"#' app/public/manifest.webmanifest
+          sed -i 's#<title id="t">VetCare</title>#<title id="t">Pontual</title>#' app/public/logo.svg
+          sed -i "s#<b>VetCare</b>#<b>Pontual</b>#g; s#'VetCare'#'Pontual'#g" app/src/components/Layout.tsx app/src/pages/Login.tsx
+          sed -i "s#appName: 'VetCare'#appName: 'Pontual'#" app/capacitor.config.ts
+          sed -i 's#>VetCare<#>Pontual<#g' app/android/app/src/main/res/values/strings.xml
+          sed -i 's#^/\* VetCare #/* Pontual #' app/src/styles.css
+          grep -rn "VetCare" app/index.html app/public app/src app/capacitor.config.ts app/android/app/src/main/res/values/strings.xml && exit 1 || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Nome do app: Pontual - Sistema para Clínicas"
+          git push
