@@ -52,7 +52,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <aside className="sidebar">
           <div className="sidebar-brand">
             <img src="logo.svg" alt="" width={34} height={34} />
-            <div><b>VetCare</b><small>{boot.clinic.name}</small></div>
+            <div><b>Pontual</b><small>{boot.clinic.name}</small></div>
           </div>
           {can('agenda.write') && (
             <Button variant="primary" className="sidebar-cta" icon={<CalendarPlus size={17} />} onClick={() => ws.openNew()}>
@@ -77,7 +77,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="main">
           <header className="mobile-top">
             <img src="logo.svg" alt="" width={28} height={28} />
-            <b>{current?.label ?? 'VetCare'}</b>
+            <b>{current?.label ?? 'Pontual'}</b>
             <button className="icon-btn" onClick={() => setPwOpen(true)} aria-label="Trocar senha"><KeyRound size={17} /></button>
             <button className="icon-btn" onClick={signOut} aria-label="Sair"><LogOut size={17} /></button>
           </header>

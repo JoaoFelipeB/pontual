@@ -42,7 +42,7 @@ export function LoginPage() {
   return (
     <div className="auth">
       <aside className="auth-side">
-        <div className="auth-brand"><img src="logo.svg" alt="" width={40} height={40} /><b>VetCare</b></div>
+        <div className="auth-brand"><img src="logo.svg" alt="" width={40} height={40} /><b>Pontual</b></div>
         <h1>Agenda e prontuário da sua clínica veterinária, no celular e no computador.</h1>
         <ul>
           <li><CalendarCheck size={18} />Agenda por horário, sem conflito, com confirmação por WhatsApp.</li>
@@ -52,7 +52,7 @@ export function LoginPage() {
       </aside>
       <main className="auth-main">
         <div className="auth-card">
-          <div className="auth-brand mobile-only"><img src="logo.svg" alt="" width={36} height={36} /><b>VetCare</b></div>
+          <div className="auth-brand mobile-only"><img src="logo.svg" alt="" width={36} height={36} /><b>Pontual</b></div>
           {forgot ? <ForgotPassword initialEmail={email} onBack={() => setForgot(false)} /> : sent ? (
             <>
               <h2>Confirme seu e-mail</h2>
@@ -100,7 +100,7 @@ export function OnboardingPage() {
     <div className="auth auth-single">
       <main className="auth-main">
         <div className="auth-card">
-          <div className="auth-brand"><img src="logo.svg" alt="" width={36} height={36} /><b>VetCare</b></div>
+          <div className="auth-brand"><img src="logo.svg" alt="" width={36} height={36} /><b>Pontual</b></div>
           {step === 'choice' ? (
             <>
               <h2>Quase lá</h2>
@@ -175,7 +175,7 @@ export function NewPasswordPage() {
     <div className="auth auth-single">
       <main className="auth-main">
         <form className="auth-card" onSubmit={save} noValidate>
-          <div className="auth-brand"><img src="logo.svg" alt="" width={36} height={36} /><b>VetCare</b></div>
+          <div className="auth-brand"><img src="logo.svg" alt="" width={36} height={36} /><b>Pontual</b></div>
           <h2>Nova senha</h2>
           <Field label="Nova senha" hint="Mínimo de 8 caracteres."><Input type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
           <Field label="Repita a nova senha"><Input type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></Field>
