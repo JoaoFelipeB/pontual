@@ -1,0 +1,136 @@
+# Tests and publishes the app: web version (GitHub Pages) and Android APK (Releases).
+# Runs automatically after "Aplicar atualização (zip)" finishes, on changes pushed to main,
+# or by hand (Run workflow). If any test fails, nothing is published.
+name: Publicar (testes, site e APK)
+
+on:
+  workflow_run:
+    workflows: ['Aplicar atualização (zip)']
+    types: [completed]
+  push:
+    branches: [main]
+    paths-ignore: ['vetcare.zip', '**.md', '.github/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: '**/package-lock.json' }
+      - name: Install
+        run: npm ci && npm --prefix app ci
+      - name: Database tests (security, permissions, business rules)
+        run: npm test
+      - name: Screen tests (desktop and phone)
+        run: npx playwright install --with-deps chromium && npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: screen-test-traces, path: test-results, retention-days: 7 }
+
+  web:
+    needs: tests
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json }
+      - run: npm --prefix app ci
+      - name: Build web app
+        run: npm --prefix app run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: app/dist }
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  apk:
+    needs: tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Check secrets
+        env:
+          URL: ${{ secrets.VITE_SUPABASE_URL }}
+          KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ] || [ -z "$PW" ]; then
+            echo "::error::Faltam secrets: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY e ANDROID_KEY_PASSWORD."
+            exit 1
+          fi
+      - run: npm ci
+      - name: Build web app for Android
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_BUILD: ${{ github.run_number }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
+        run: npm run build
+      - name: Copy web app into Android project
+        run: npx cap sync android
+      - name: Text-free splash (logo on light background)
+        working-directory: app/android/app/src/main/res
+        run: |
+          find . -name splash.png -delete
+          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' \
+            '<layer-list xmlns:android="http://schemas.android.com/apk/res/android">' \
+            '  <item android:drawable="@color/splash_background"/>' \
+            '  <item android:width="144dp" android:height="144dp" android:gravity="center" android:drawable="@mipmap/ic_launcher"/>' \
+            '</layer-list>' > drawable/splash.xml
+          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<resources><color name="splash_background">#F5F6F8</color></resources>' > values/splash_colors.xml
+      - name: Build signed APK
+        working-directory: app/android
+        env:
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          if [ ! -f keystore.p12.enc ]; then
+            echo "::error::Falta a chave de assinatura. Rode uma vez o workflow 'Criar chave de assinatura (uma vez)'."
+            exit 1
+          fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -in keystore.p12.enc -out "$RUNNER_TEMP/ks.p12" -pass env:ANDROID_KEY_PASSWORD
+          export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/ks.p12"
+          ./gradlew assembleRelease --no-daemon
+          rm "$RUNNER_TEMP/ks.p12"
+          cp app/build/outputs/apk/release/app-release.apk ../../Pontual.apk
+      - name: Publish on Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: Pontual - Sistema para Clínicas 1.0.${{ github.run_number }}
+          body: |
+            Versão 1.0.${{ github.run_number }}.
+            Baixe o arquivo **Pontual.apk** abaixo no celular Android e instale.
+            Quem já tem o app instalado só precisa instalar por cima: os dados ficam na nuvem.
+            O próprio app avisa quando existe versão nova.
+          files: Pontual.apk
+          make_latest: true
