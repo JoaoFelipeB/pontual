@@ -1,11 +1,13 @@
-# How updates arrive: upload vetcare.zip through the GitHub website (Add file > Upload files).
-# This workflow unpacks it into the repository; "Publicar" then runs by itself.
+# How updates arrive (either one):
+#   1. vetcare.zip uploaded through the GitHub website (Add file > Upload files), or
+#   2. update.patch.b64 (a compressed patch) committed to the repository.
+# This workflow applies it and removes the file; "Publicar" then runs by itself.
 # (Workflow files in .github/ are not touched: GitHub does not allow it from here.)
 name: Aplicar atualização (zip)
 
 on:
   push:
-    paths: ['vetcare.zip']
+    paths: ['vetcare.zip', 'update.patch.b64']
   workflow_dispatch:
 
 permissions:
@@ -16,14 +18,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unzip into repository
+      - name: Apply update
         run: |
-          test -f vetcare.zip || { echo "vetcare.zip não encontrado"; exit 0; }
-          unzip -q vetcare.zip -d "$RUNNER_TEMP/x"
-          rsync -a --exclude .github "$RUNNER_TEMP/x/vetcare/" ./
-          git rm -q vetcare.zip
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f vetcare.zip ]; then
+            unzip -q vetcare.zip -d "$RUNNER_TEMP/x"
+            rsync -a --exclude .github "$RUNNER_TEMP/x/vetcare/" ./
+            git rm -q vetcare.zip
+          fi
+          if [ -f update.patch.b64 ]; then
+            base64 -d update.patch.b64 | gunzip | git apply --whitespace=nowarn
+            git rm -q update.patch.b64
+          fi
           git add -A
-          git commit -m "Atualização do projeto (zip)"
+          git diff --cached --quiet && { echo "Nada para aplicar"; exit 0; }
+          git commit -m "Atualização do projeto"
           git push
