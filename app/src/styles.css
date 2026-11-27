@@ -344,6 +344,14 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
 .creds { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
 .creds .btn { align-self: flex-start; }
 .form-section .suspend-row + .suspend-row { margin-top: 8px; }
+.perms { display: flex; flex-direction: column; }
+.perm-table td small { display: block; color: var(--text-3); font-size: .8rem; font-weight: 400; }
+.perm-table th.c, .perm-table td.c { text-align: center; width: 110px; }
+.perm-table input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+.perm-table input[type=checkbox]:disabled { cursor: not-allowed; opacity: .55; }
+.perm-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border); }
+.pad-x { padding: 0 18px; }
+.table-wrap { overflow-x: auto; }
 .settings-card .form-section { padding: 0 18px 18px; }
 
 /* ------------------------------------------------------------ overlays */
@@ -499,6 +507,7 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
   .history button { flex-wrap: wrap; }
   .history .grow { flex-basis: calc(100% - 100px); }
   .audit-list li { grid-template-columns: 1fr; }
+  .perm-table th.c, .perm-table td.c { width: 74px; font-size: .78rem; }
   .req { flex-wrap: wrap; padding: 14px; }
   .page-head .segmented { max-width: 100%; overflow-x: auto; }
   .page-head .segmented button { flex: none; }

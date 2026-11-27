@@ -3,6 +3,7 @@ import { Building2, CalendarDays, Check, Eye, History, Inbox, MessageCircle, Plu
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { PlatformUsers } from './PlatformUsers';
+import { RolePermissionsEditor } from '../components/RolePermissions';
 import { addDays, animalLine, fmtDate, fmtShort, initials, maskPhone, ROLE_LABEL, waLink } from '../lib/format';
 import type { AuditEntry, Company, CompanyDetail, OverviewRow, PlatformAppointment, PlatformRequest } from '../lib/types';
 import { Button, Confirm, Drawer, Empty, Field, Input, PlanBadge, Segmented, Select, SpeciesIcon, Spinner, StatusBadge, Textarea, toast, useDebounced } from '../components/ui';
@@ -441,6 +442,12 @@ function CompanyDrawer({ id, onClose, onChanged, onSupport }: {
                     </div>
                     <Button icon={<Eye size={16} />} onClick={() => onSupport(detail.id)}>Ver atendimentos</Button>
                   </div>
+                </section>
+
+                <section className="form-section">
+                  <h3>Permissões dos perfis nesta empresa</h3>
+                  <RolePermissionsEditor key={detail.id} load={() => api.platformRolePermissions(detail.id)}
+                    save={(p) => api.platformSaveRolePermissions(detail.id, p)} />
                 </section>
 
                 <section className="form-section">

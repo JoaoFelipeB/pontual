@@ -1,4 +1,5 @@
 import { createAccountClient, supabase } from './supabase';
+import type { RoleMatrix } from '../components/RolePermissions';
 import type { Appointment, AuditEntry, Bootstrap, PlatformUser, Company, CompanyDetail, OverviewRow, PlatformAppointment, PlatformRequest, Slot, TutorDetail, TutorSummary } from './types';
 
 /** Error returned by the database API: message for the user + per-field messages. */
@@ -124,6 +125,12 @@ export const api = {
     const user = await rpc<PlatformUser>('platform_save_user', { p_user_id: existing.user_id, p: { name: p.name, clinic_id: p.clinic_id, role: p.role, active: true } });
     return { user, created };
   },
+
+  rolePermissions: () => rpc<RoleMatrix>('get_role_permissions'),
+  saveRolePermissions: (p: Record<string, Record<string, boolean>>) => rpc<RoleMatrix>('save_role_permissions', { p }),
+  platformRolePermissions: (clinicId: string) => rpc<RoleMatrix>('platform_get_role_permissions', { p_clinic: clinicId }),
+  platformSaveRolePermissions: (clinicId: string, p: Record<string, Record<string, boolean>>) =>
+    rpc<RoleMatrix>('platform_save_role_permissions', { p_clinic: clinicId, p }),
 
   updateMember: (id: string, role?: string, active?: boolean) =>
     rpc<any>('update_member', { p_id: id, p_role: role ?? null, p_active: active ?? null })

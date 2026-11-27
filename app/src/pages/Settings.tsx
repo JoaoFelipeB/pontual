@@ -3,9 +3,10 @@ import { Building2, KeyRound, Mail, Plus, ShieldCheck, Stethoscope, Users } from
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { fmtDate, initials, maskPhone, ROLE_LABEL, SPECIES_LABEL } from '../lib/format';
+import { RolePermissionsEditor } from '../components/RolePermissions';
 import { Button, Confirm, Drawer, Field, Input, Segmented, Select, Spinner, toast } from '../components/ui';
 
-type Tab = 'clinica' | 'planos' | 'equipe';
+type Tab = 'clinica' | 'planos' | 'equipe' | 'perfis';
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('equipe');
@@ -14,11 +15,18 @@ export function SettingsPage() {
       <div className="page-head">
         <div><h1>Configurações</h1></div>
         <Segmented label="Seção" value={tab} onChange={setTab}
-          options={[{ value: 'equipe', label: 'Equipe' }, { value: 'planos', label: 'Planos' }, { value: 'clinica', label: 'Clínica' }]} />
+          options={[{ value: 'equipe', label: 'Equipe' }, { value: 'perfis', label: 'Permissões' }, { value: 'planos', label: 'Planos' }, { value: 'clinica', label: 'Clínica' }]} />
       </div>
       {tab === 'clinica' && <ClinicTab />}
       {tab === 'planos' && <PlansTab />}
       {tab === 'equipe' && <TeamTab />}
+      {tab === 'perfis' && (
+        <section className="card settings-card">
+          <header className="card-head"><h2>O que cada perfil pode fazer</h2></header>
+          <p className="muted pad-x">Ajuste para a rotina da sua clínica. Exemplo: sem recepção, libere <b>Agendar e editar</b> para o Veterinário.</p>
+          <RolePermissionsEditor load={api.rolePermissions} save={api.saveRolePermissions} />
+        </section>
+      )}
     </div>
   );
 }

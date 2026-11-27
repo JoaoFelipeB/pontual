@@ -87,6 +87,7 @@ test('recepção agenda pelo formulário; vet ocupado some só para ele', async 
 
 test('lembretes de amanhã abrem o WhatsApp com mensagem pronta e marcam enviado', async ({ page }) => {
   await login(page, 'admin@demo.com', 'admin12345');
+  await expect(page.getByRole('heading', { name: /Bom dia|Boa (tarde|noite)/ })).toBeVisible();
   await page.goto('./#/agenda');
   await page.getByRole('button', { name: 'Lembretes de amanhã' }).click();
   const send = page.getByRole('dialog').getByRole('link', { name: 'Enviar' }).first();
@@ -141,4 +142,23 @@ test('dono cria usuário com senha temporária, edita e a pessoa entra', async (
   await p2.getByRole('checkbox').check();
   await p2.getByRole('button', { name: 'Aceitar e continuar' }).click();
   await expect(p2.getByRole('heading', { name: /Boa (tarde|noite)|Bom dia/ })).toBeVisible();
+});
+
+test('admin libera o veterinário para agendar (clínica sem recepção)', async ({ browser, page }) => {
+  await login(page, 'admin@demo.com', 'admin12345');
+  await expect(page.getByRole('heading', { name: /Bom dia|Boa (tarde|noite)/ })).toBeVisible(); // signed in
+  await page.goto('./#/configuracoes');
+  await page.getByRole('tab', { name: 'Permissões' }).click();
+  const box = page.getByRole('checkbox', { name: 'Veterinário: Agendar e editar agendamentos' });
+  if (!(await box.isChecked())) {
+    await box.check();
+    await page.getByRole('button', { name: 'Salvar permissões' }).click();
+    await expect(page.getByText(/Permissões salvas/)).toBeVisible();
+  }
+
+  const v = await (await browser.newContext({ viewport: page.viewportSize()! })).newPage();
+  await login(v, 'vet@demo.com', 'senha12345');
+  await expect(v.getByRole('heading', { name: /Bom dia|Boa (tarde|noite)/ })).toBeVisible();
+  if (isMobile(v)) await expect(v.locator('.tab-cta')).toBeVisible();
+  else await expect(v.getByRole('button', { name: 'Novo agendamento' })).toBeVisible();
 });
