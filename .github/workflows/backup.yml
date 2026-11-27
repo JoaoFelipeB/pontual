@@ -1,0 +1,52 @@
+# Weekly backup of the database, encrypted with BACKUP_PASSWORD (the repository is public,
+# so the file is useless without that password). Kept for 90 days under Actions > this run > Artifacts.
+# Restore instructions: COMECE-AQUI.md, section "Backup".
+name: Backup semanal do banco
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'   # Sundays 03:00 (Brasília)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          PW: ${{ secrets.BACKUP_PASSWORD }}
+        run: |
+          if [ -z "$DB" ] || [ ${#PW} -lt 16 ]; then
+            echo "::error::Cadastre os secrets SUPABASE_DB_URL e BACKUP_PASSWORD (mínimo 16 caracteres)."
+            exit 1
+          fi
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+      - name: Dump, compress and encrypt
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          PGDUMP=/usr/lib/postgresql/17/bin/pg_dump
+          STAMP=$(date -u +%Y-%m-%d)
+          {
+            echo "-- Pontual backup $STAMP"
+            "$PGDUMP" "$DB" --no-owner --no-privileges --schema=public --schema=vc_private
+            echo "-- auth.users (logins)"
+            "$PGDUMP" "$DB" --no-owner --no-privileges --data-only --table=auth.users
+          } | gzip -9 | openssl enc -aes-256-cbc -pbkdf2 -iter 300000 -salt -pass env:BACKUP_PASSWORD -out "pontual-$STAMP.sql.gz.enc"
+          ls -lh pontual-*.enc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_number }}
+          path: pontual-*.sql.gz.enc
+          retention-days: 90
