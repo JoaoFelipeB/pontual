@@ -162,3 +162,9 @@ test('admin libera o veterinário para agendar (clínica sem recepção)', async
   if (isMobile(v)) await expect(v.locator('.tab-cta')).toBeVisible();
   else await expect(v.getByRole('button', { name: 'Novo agendamento' })).toBeVisible();
 });
+
+test('trocar para a aba "Criar conta" não mostra erro antes de digitar', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('tab', { name: 'Criar conta' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});

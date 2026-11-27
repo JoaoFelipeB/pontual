@@ -351,6 +351,7 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
 .perm-table input[type=checkbox]:disabled { cursor: not-allowed; opacity: .55; }
 .perm-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border); }
 .pad-x { padding: 0 18px; }
+.pad-b { padding-bottom: 16px; }
 .table-wrap { overflow-x: auto; }
 .settings-card .form-section { padding: 0 18px 18px; }
 

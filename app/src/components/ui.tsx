@@ -10,7 +10,7 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 export function Button({ variant = 'secondary', size = 'md', loading, icon, children, className = '', disabled, ...rest }: BtnProps) {
   return (
-    <button className={`btn btn-${variant} btn-${size} ${className}`} disabled={disabled || loading} {...rest}>
+    <button type="button" className={`btn btn-${variant} btn-${size} ${className}`} disabled={disabled || loading} {...rest}>
       {loading ? <LoaderCircle className="spin" size={16} /> : icon}
       {children && <span>{children}</span>}
     </button>
@@ -151,7 +151,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   return (
     <div className="segmented" role="tablist" aria-label={label}>
       {options.map((o) => (
-        <button key={o.value} role="tab" aria-selected={value === o.value} className={value === o.value ? 'is-active' : ''} onClick={() => onChange(o.value)}>
+        <button key={o.value} type="button" role="tab" aria-selected={value === o.value} className={value === o.value ? 'is-active' : ''} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}

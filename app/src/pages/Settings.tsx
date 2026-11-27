@@ -19,7 +19,7 @@ export function SettingsPage() {
       </div>
       {tab === 'clinica' && <ClinicTab />}
       {tab === 'planos' && <PlansTab />}
-      {tab === 'equipe' && <TeamTab />}
+      {tab === 'equipe' && <TeamTab onPermissions={() => setTab('perfis')} />}
       {tab === 'perfis' && (
         <section className="card settings-card">
           <header className="card-head"><h2>O que cada perfil pode fazer</h2></header>
@@ -154,7 +154,7 @@ function PlanDrawer({ plan, onClose, onSaved }: { plan: any | null; onClose: () 
 }
 
 // ------------------------------------------------------------------ team
-function TeamTab() {
+function TeamTab({ onPermissions }: { onPermissions?: () => void }) {
   const { refresh } = useSession();
   const [team, setTeam] = useState<{ members: any[]; invites: any[] } | null>(null);
   const [invite, setInvite] = useState(false);
@@ -218,17 +218,8 @@ function TeamTab() {
 
       <section className="card roles">
         <header className="card-head"><h2><Stethoscope size={18} /> O que cada perfil pode fazer</h2></header>
-        <table className="table">
-          <thead><tr><th>Ação</th><th>Admin</th><th>Recepção</th><th>Veterinário</th></tr></thead>
-          <tbody className="matrix">
-            {[
-              ['Ver agenda, pacientes e painel', 1, 1, 1], ['Agendar e editar', 1, 1, 0], ['Concluir e anotar observações', 1, 1, 1],
-              ['Cancelar, registrar falta, reabrir', 1, 1, 0], ['Excluir agendamento', 1, 0, 0], ['Equipe, planos e clínica', 1, 0, 0]
-            ].map(([l, ...v]) => (
-              <tr key={l as string} className="no-hover"><td>{l}</td>{v.map((x, i) => <td key={i}>{x ? '✓' : '—'}</td>)}</tr>
-            ))}
-          </tbody>
-        </table>
+        <p className="muted pad">O Administrador pode tudo. O que Recepção e Veterinário podem fazer nesta clínica é ajustado na aba <b>Permissões</b>.</p>
+        {onPermissions && <div className="pad-x pad-b"><Button size="sm" onClick={onPermissions}>Ver e ajustar permissões</Button></div>}
       </section>
 
       <ResetDrawer member={reset} onClose={() => setReset(null)} />
