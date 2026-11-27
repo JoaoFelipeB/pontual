@@ -108,3 +108,32 @@ test('dono vê atendimentos de todas as empresas, só leitura, e o registro', as
   await page.getByRole('tab', { name: 'Registro' }).click();
   await expect(page.getByText('Consultou atendimentos').first()).toBeVisible();
 });
+
+test('dono cria usuário com senha temporária, edita e a pessoa entra', async ({ browser, page }) => {
+  const email = `criado-${unique()}@gmail.com`;
+  await login(page, 'dono@demo.com', 'dono12345');
+  await page.getByRole('tab', { name: 'Usuários' }).click();
+  await page.getByRole('button', { name: 'Novo usuário' }).click();
+  const d = page.getByRole('dialog');
+  await d.getByLabel('Nome completo').fill('Marina Costa');
+  await d.getByLabel('E-mail (login)').fill(email);
+  await d.getByLabel('Empresa').selectOption({ label: 'PetVida Centro Veterinário' });
+  await d.getByLabel('Perfil').selectOption('veterinario');
+  const password = await d.getByLabel('Senha temporária').inputValue();
+  await d.getByRole('button', { name: 'Criar usuário' }).click();
+  await expect(d.getByText('Conta criada.')).toBeVisible();
+  await d.getByRole('button', { name: 'Concluir' }).click();
+
+  // edit: change role
+  await page.getByRole('row', { name: new RegExp(email) }).click();
+  await page.getByRole('dialog').getByLabel('Perfil').selectOption('recepcao');
+  await page.getByRole('dialog').getByRole('button', { name: 'Salvar alterações' }).click();
+  await expect(page.getByText('Alterações salvas.')).toBeVisible();
+
+  // the person signs in with the temporary password and accepts the terms
+  const p2 = await (await browser.newContext()).newPage();
+  await login(p2, email, password);
+  await p2.getByRole('checkbox').check();
+  await p2.getByRole('button', { name: 'Aceitar e continuar' }).click();
+  await expect(p2.getByRole('heading', { name: /Boa (tarde|noite)|Bom dia/ })).toBeVisible();
+});

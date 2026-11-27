@@ -71,3 +71,10 @@ export interface AuditEntry {
   id: number; created_at: string; action: string; entity: string; entity_id: string | null;
   actor: string | null; company: string | null; data: Record<string, unknown> | null;
 }
+export interface PlatformUser {
+  user_id: string; email: string; created_at: string; last_sign_in_at: string | null;
+  member_id: string | null; name: string | null; role: Role | null; active: boolean | null;
+  clinic_id: string | null; clinic_name: string | null; clinic_active: boolean | null;
+  platform_admin: boolean; request_status: 'pending' | 'approved' | 'rejected' | null;
+  request_company_hint: string | null; phone: string | null;
+}

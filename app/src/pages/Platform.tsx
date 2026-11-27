@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Building2, CalendarDays, Check, Eye, History, Inbox, MessageCircle, Plus, Search, ShieldAlert, X } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
+import { PlatformUsers } from './PlatformUsers';
 import { addDays, animalLine, fmtDate, fmtShort, initials, maskPhone, ROLE_LABEL, waLink } from '../lib/format';
 import type { AuditEntry, Company, CompanyDetail, OverviewRow, PlatformAppointment, PlatformRequest } from '../lib/types';
 import { Button, Confirm, Drawer, Empty, Field, Input, PlanBadge, Segmented, Select, SpeciesIcon, Spinner, StatusBadge, Textarea, toast, useDebounced } from '../components/ui';
 
-type Tab = 'liberacoes' | 'empresas' | 'atendimentos' | 'registro';
+type Tab = 'liberacoes' | 'usuarios' | 'empresas' | 'atendimentos' | 'registro';
 
 /** Platform owner area: access requests, client companies and read-only view of their appointments. */
 export function PlatformPage() {
@@ -17,9 +18,10 @@ export function PlatformPage() {
       <div className="page-head">
         <div><h1>Plataforma</h1><p className="muted">Empresas clientes, liberação de acesso e atendimentos de todos os clientes.</p></div>
         <Segmented label="Seção" value={tab} onChange={setTab}
-          options={[{ value: 'liberacoes', label: 'Liberações' }, { value: 'empresas', label: 'Empresas' }, { value: 'atendimentos', label: 'Atendimentos' }, { value: 'registro', label: 'Registro' }]} />
+          options={[{ value: 'liberacoes', label: 'Liberações' }, { value: 'usuarios', label: 'Usuários' }, { value: 'empresas', label: 'Empresas' }, { value: 'atendimentos', label: 'Atendimentos' }, { value: 'registro', label: 'Registro' }]} />
       </div>
       {tab === 'liberacoes' && <Requests />}
+      {tab === 'usuarios' && <PlatformUsers />}
       {tab === 'empresas' && <Companies onSupport={(id) => { setClinic(id); setTab('atendimentos'); }} />}
       {tab === 'atendimentos' && <Appointments clinic={clinic} setClinic={setClinic} />}
       {tab === 'registro' && <AuditLog />}

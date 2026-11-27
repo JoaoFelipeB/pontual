@@ -1,5 +1,5 @@
-import { supabase } from './supabase';
-import type { Appointment, AuditEntry, Bootstrap, Company, CompanyDetail, OverviewRow, PlatformAppointment, PlatformRequest, Slot, TutorDetail, TutorSummary } from './types';
+import { createAccountClient, supabase } from './supabase';
+import type { Appointment, AuditEntry, Bootstrap, PlatformUser, Company, CompanyDetail, OverviewRow, PlatformAppointment, PlatformRequest, Slot, TutorDetail, TutorSummary } from './types';
 
 /** Error returned by the database API: message for the user + per-field messages. */
 export class ApiError extends Error {
@@ -90,6 +90,40 @@ export const api = {
   platformAppointment: (id: string) => rpc<PlatformAppointment>('platform_get_appointment', { p_id: id }),
   platformOverview: () => rpc<{ companies: OverviewRow[] }>('platform_overview'),
   platformAudit: (before?: number | null, limit = 100) => rpc<AuditEntry[]>('platform_list_audit', { p_limit: limit, p_before: before ?? null }),
+
+  platformUsers: (q = '') => rpc<PlatformUser[]>('platform_list_users', { p_q: q }),
+  platformFindUser: (email: string) => rpc<PlatformUser | null>('platform_find_user', { p_email: email }),
+  platformSaveUser: (userId: string, p: { name: string; clinic_id: string; role: string; active: boolean }) =>
+    rpc<PlatformUser>('platform_save_user', { p_user_id: userId, p }),
+  platformRemoveAccess: (userId: string) => rpc<PlatformUser>('platform_remove_access', { p_user_id: userId }),
+  platformResetPassword: (userId: string, password: string) =>
+    rpc<PlatformUser>('platform_reset_password', { p_user_id: userId, p_new_password: password }),
+  platformSetOwner: (userId: string, owner: boolean) => rpc<PlatformUser>('platform_set_owner', { p_user_id: userId, p_owner: owner }),
+  /**
+   * Creates the login (e-mail + temporary password) without touching the owner's own session,
+   * then gives it access to the company. If the e-mail already has an account, it is reused.
+   */
+  platformCreateUser: async (p: { email: string; name: string; clinic_id: string; role: string; password: string }) => {
+    const email = p.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ApiError('Confira os campos destacados.', 'VC422', { email: 'E-mail inválido.' });
+    let existing = await rpc<PlatformUser | null>('platform_find_user', { p_email: email });
+    let created = false;
+    if (!existing) {
+      const { error } = await createAccountClient().auth.signUp({ email, password: p.password });
+      if (error && !/already registered/i.test(error.message)) {
+        throw new ApiError(/password/i.test(error.message) ? 'Senha temporária fraca demais. Gere outra.' : error.message, 'VC422',
+          /password/i.test(error.message) ? { password: 'Senha fraca.' } : {});
+      }
+      existing = await rpc<PlatformUser | null>('platform_find_user', { p_email: email });
+      if (!existing) throw new ApiError('Não foi possível criar a conta. Tente de novo.', 'VC500');
+      created = !error;
+    }
+    if (existing.member_id && existing.clinic_id !== p.clinic_id) {
+      throw new ApiError(`Este e-mail já tem acesso à empresa ${existing.clinic_name}. Edite a pessoa na lista.`, 'VC409', { email: 'E-mail já cadastrado.' });
+    }
+    const user = await rpc<PlatformUser>('platform_save_user', { p_user_id: existing.user_id, p: { name: p.name, clinic_id: p.clinic_id, role: p.role, active: true } });
+    return { user, created };
+  },
 
   updateMember: (id: string, role?: string, active?: boolean) =>
     rpc<any>('update_member', { p_id: id, p_role: role ?? null, p_active: active ?? null })

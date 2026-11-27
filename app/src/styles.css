@@ -340,6 +340,10 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
 .audit-list li:first-child { border-top: 0; }
 .audit-list time { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .audit-list small { color: var(--text-3); }
+.owner-tag { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--primary); }
+.creds { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.creds .btn { align-self: flex-start; }
+.form-section .suspend-row + .suspend-row { margin-top: 8px; }
 .settings-card .form-section { padding: 0 18px 18px; }
 
 /* ------------------------------------------------------------ overlays */
@@ -496,6 +500,8 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
   .history .grow { flex-basis: calc(100% - 100px); }
   .audit-list li { grid-template-columns: 1fr; }
   .req { flex-wrap: wrap; padding: 14px; }
+  .page-head .segmented { max-width: 100%; overflow-x: auto; }
+  .page-head .segmented button { flex: none; }
   .req-actions { width: 100%; justify-content: flex-start; padding-left: 48px; }
   .suspend-row { flex-direction: column; align-items: flex-start; }
   .card { overflow-x: auto; }

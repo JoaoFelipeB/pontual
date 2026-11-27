@@ -9,7 +9,9 @@ create table auth.users (
   email text unique,
   raw_user_meta_data jsonb default '{}',
   encrypted_password text,
-  updated_at timestamptz
+  updated_at timestamptz,
+  created_at timestamptz default now(),
+  last_sign_in_at timestamptz
 );
 create schema if not exists extensions;
 create extension if not exists pgcrypto schema extensions;
