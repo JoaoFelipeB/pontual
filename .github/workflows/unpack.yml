@@ -1,6 +1,7 @@
-# Run once: unpacks vetcare.zip (uploaded through the web) into the repository.
-# GitHub does not let this token write workflow files, so .github/ is added separately.
-name: Desempacotar projeto (uso único)
+# How updates arrive: upload vetcare.zip through the GitHub website (Add file > Upload files).
+# This workflow unpacks it into the repository; "Publicar" then runs by itself.
+# (Workflow files in .github/ are not touched: GitHub does not allow it from here.)
+name: Aplicar atualização (zip)
 
 on:
   push:
@@ -24,5 +25,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Projeto VetCare"
+          git commit -m "Atualização do projeto (zip)"
           git push
