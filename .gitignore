@@ -7,3 +7,6 @@ app/android/build
 *.apk
 app/android/app/src/main/assets/public
 app/android/app/src/main/assets/capacitor*.json
+app/dist-e2e
+test-results
+playwright-report

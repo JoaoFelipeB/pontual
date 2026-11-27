@@ -5,6 +5,7 @@ import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { Button, Field, Input, Segmented, Textarea, toast } from '../components/ui';
 import { maskPhone } from '../lib/format';
+import { markTermsTicked, TermsLink } from './Legal';
 
 const AUTH_MSG: Record<string, string> = {
   'Invalid login credentials': 'E-mail ou senha incorretos.',
@@ -22,6 +23,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [terms, setTerms] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +34,8 @@ export function LoginPage() {
         if (error) setError(authMsg(error.message));
       } else {
         if (password.length < 8) { setError('Use uma senha com pelo menos 8 caracteres.'); return; }
+        if (!terms) { setError('Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.'); return; }
+        markTermsTicked();
         const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
         if (error) setError(authMsg(error.message));
         else if (!data.session) setSent(true);
@@ -70,6 +74,12 @@ export function LoginPage() {
               <Field label="Senha" hint={mode === 'criar' ? 'Mínimo de 8 caracteres.' : undefined}>
                 <Input type="password" autoComplete={mode === 'entrar' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} required />
               </Field>
+              {mode === 'criar' && (
+                <label className="check">
+                  <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+                  <span>Li e aceito os <TermsLink />.</span>
+                </label>
+              )}
               {error && <div className="alert" role="alert">{error}</div>}
               <Button variant="primary" type="submit" loading={busy} className="block">{mode === 'entrar' ? 'Entrar' : 'Criar conta'}</Button>
               {mode === 'entrar' && <button type="button" className="link center" onClick={() => setForgot(true)}>Esqueci minha senha</button>}

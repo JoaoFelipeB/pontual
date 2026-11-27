@@ -5,10 +5,14 @@
   "scripts": {
     "test": "vitest run",
     "dev": "npm --prefix app run dev",
-    "build": "npm --prefix app run build"
+    "build": "npm --prefix app run build",
+    "e2e:build": "cd app && VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_ANON_KEY=local npx vite build --outDir dist-e2e",
+    "e2e:server": "npm run e2e:build && SEED=1 node tests/fake-supabase.mjs 54321 app/dist-e2e",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.6.0",
+    "@playwright/test": "^1.65.1",
     "vitest": "^5.1.1"
   }
 }

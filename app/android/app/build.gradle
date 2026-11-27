@@ -4,7 +4,7 @@ android {
     namespace = "br.com.vetcare.agenda"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "br.com.vetcare.agenda"
+        applicationId "br.com.pontual.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI sets VERSION_CODE (build number) so every new APK installs over the previous one.

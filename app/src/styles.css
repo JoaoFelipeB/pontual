@@ -314,6 +314,32 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
 .suspend-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 .suspend-row b { display: block; }
 .suspend-row small { display: block; font-size: .84rem; }
+.notice { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; border-radius: 10px; background: var(--amber-bg); color: var(--amber); font-size: .88rem; }
+.notice svg { flex: none; margin-top: 1px; }
+.support-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--primary-50); color: var(--primary); font-size: .88rem; border-bottom: 1px solid var(--border); }
+.support-bar .link { margin-left: auto; }
+.small-note { font-size: .82rem; }
+.reminders { list-style: none; margin: 0; padding: 0; }
+.reminders li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.reminders li:first-child { border-top: 0; }
+.reminders .time { width: 44px; font-weight: 600; }
+.reminders b { display: block; }
+.reminders small { color: var(--text-3); font-size: .8rem; }
+.reminders .sent { display: inline-flex; align-items: center; gap: 4px; color: var(--green); font-size: .84rem; font-weight: 600; }
+.reminders li.is-sent { opacity: .7; }
+.update-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 14px; border-radius: 10px; background: var(--primary); color: #fff; font-size: .9rem; }
+.update-bar .btn { margin-left: auto; background: #fff; color: var(--primary); }
+.terms-box { max-height: 46vh; overflow-y: auto; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: .88rem; line-height: 1.55; }
+.terms-box h3 { margin: 14px 0 4px; font-size: .92rem; }
+.terms-box h3:first-child { margin-top: 0; }
+.terms-box p, .terms-box ul { margin: 0 0 8px; }
+.check { display: flex; align-items: flex-start; gap: 10px; font-size: .9rem; }
+.check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex: none; }
+.audit-list { list-style: none; margin: 0; padding: 0; }
+.audit-list li { display: grid; grid-template-columns: 140px 1fr; gap: 4px 14px; padding: 11px 18px; border-top: 1px solid var(--border); font-size: .88rem; }
+.audit-list li:first-child { border-top: 0; }
+.audit-list time { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.audit-list small { color: var(--text-3); }
 .settings-card .form-section { padding: 0 18px 18px; }
 
 /* ------------------------------------------------------------ overlays */
@@ -468,6 +494,7 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
   .detail-actions .spacer { display: none; }
   .history button { flex-wrap: wrap; }
   .history .grow { flex-basis: calc(100% - 100px); }
+  .audit-list li { grid-template-columns: 1fr; }
   .req { flex-wrap: wrap; padding: 14px; }
   .req-actions { width: 100%; justify-content: flex-start; padding-left: 48px; }
   .suspend-row { flex-direction: column; align-items: flex-start; }

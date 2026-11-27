@@ -1,145 +1,117 @@
-# VetCare: como colocar no ar
+# Pontual - Sistema para Clínicas: guia de operação
 
-Este guia leva de zero até o app instalado nos celulares da equipe e acessível
-pelo navegador de qualquer computador. Tudo usa planos gratuitos:
+Tudo usa planos gratuitos:
 
-| Peça | Serviço gratuito | Para quê |
+| Peça | Serviço | Para quê |
 |---|---|---|
-| Banco de dados e login | **Supabase** | guarda agendamentos, pacientes e usuários na nuvem |
-| Geração do APK e site | **GitHub** (Actions + Pages) | monta o APK Android e publica a versão web, sem instalar nada no seu PC |
+| Banco de dados e login | Supabase (região São Paulo) | agendamentos, pacientes, usuários, liberações |
+| Código, testes, site e APK | GitHub (repositório `pontual`) | publica o site e o APK sozinho a cada atualização |
 
-Tempo estimado: 30 a 40 minutos, uma única vez.
-
----
-
-## Parte 1: banco de dados (Supabase)
-
-1. Acesse https://supabase.com e crie uma conta (pode entrar com o GitHub ou Google).
-2. Clique em **New project**:
-   - **Name**: `vetcare`
-   - **Database password**: gere uma senha forte e guarde num lugar seguro.
-   - **Region**: `South America (São Paulo)`.
-   - Clique em **Create new project** e espere uns 2 minutos.
-3. No menu da esquerda, abra **SQL Editor** e clique em **New query**.
-4. Abra o arquivo `supabase/migrations/0001_schema.sql` (do zip) no Bloco de Notas,
-   copie todo o conteúdo, cole no editor e clique em **Run**. Deve aparecer "Success".
-5. Faça o mesmo com `supabase/migrations/0002_api.sql` (nova query, colar, **Run**).
-6. Vá em **Authentication > Sign In / Providers > Email** e desligue
-   **Confirm email** (assim a equipe entra direto depois de criar a conta).
-   Se preferir manter ligado, cada pessoa precisa clicar no link do e-mail antes do primeiro acesso.
-7. Rode também, nesta ordem, `0003_admin_reset_password.sql` e `0004_platform_access.sql` (nova query, colar, **Run**).
-8. Vá em **Project Settings > API** (ou **Data API**) e anote dois valores:
-   - **Project URL** (algo como `https://abcdxyz.supabase.co`)
-   - **anon public key** (um texto longo começando com `eyJ...`)
-
-   A chave *anon* é feita para ficar dentro do app; a segurança vem das regras do banco.
-   **Nunca** use a chave `service_role` no app.
-
-## Parte 2: gerar o APK e o site (GitHub)
-
-1. Crie uma conta em https://github.com.
-2. Clique em **New repository**: nome `vetcare`, marque **Public** e crie.
-   (Público é necessário para o site gratuito no GitHub Pages. Nenhuma senha fica no código.)
-3. Envie os arquivos do zip para o repositório. O jeito mais simples:
-   - Instale o **GitHub Desktop** (https://desktop.github.com), entre com sua conta.
-   - **File > Clone repository**, escolha `vetcare` e uma pasta no PC.
-   - Extraia o conteúdo do zip **dentro dessa pasta** (a pasta `.github` precisa ir junto).
-   - No GitHub Desktop, escreva um resumo (ex.: "Primeira versão"), clique em
-     **Commit to main** e depois em **Push origin**.
-4. No site do GitHub, no repositório, vá em **Settings > Secrets and variables > Actions**
-   e crie três **New repository secret**:
-   - `VITE_SUPABASE_URL` = a Project URL da Parte 1
-   - `VITE_SUPABASE_ANON_KEY` = a anon public key da Parte 1
-   - `ANDROID_KEY_PASSWORD` = uma senha longa inventada por você (pelo menos 16 caracteres,
-     ex.: quatro palavras aleatórias). Ela protege a chave que assina o app.
-     **Guarde essa senha fora do GitHub também.** Se ela se perder, os celulares precisarão
-     desinstalar e instalar o app de novo na próxima atualização.
-5. Ainda em **Settings**, abra **Pages** e em **Source** escolha **GitHub Actions**.
-6. Vá na aba **Actions**, abra **Criar chave de assinatura (uma vez)** e clique em
-   **Run workflow**. Leva 1 minuto e só precisa ser feito uma vez na vida do projeto.
-7. Na mesma aba, abra **Android APK** e clique em **Run workflow**. Faça o mesmo em
-   **Web (GitHub Pages)**. Cada um leva de 3 a 6 minutos.
-   (Daqui para frente, toda alteração enviada gera APK e site novos sozinha, com número de
-   versão maior. Quem já tem o app instala o APK novo por cima, sem perder nada.)
-
-Quando terminar:
-- **APK**: na página do repositório, menu **Releases > VetCare (última versão) > Pontual.apk**.
-- **Site**: `https://SEU-USUARIO.github.io/vetcare/` (o endereço aparece em **Settings > Pages**).
-
-## Parte 3: primeiro acesso e controle de quem entra
-
-Ninguém usa o app sem ser liberado. Quem cria conta cai na tela **Aguardando liberação**
-até você aprovar.
-
-1. **Torne-se dono da plataforma (uma vez).** Crie sua conta no app (**Criar conta**). Depois,
-   no Supabase, abra o **SQL Editor** e rode, trocando pelo seu e-mail:
-   ```sql
-   insert into public.platform_admins (user_id)
-   select id from auth.users where email = 'seu@email.com';
-   ```
-   Entre de novo no app: aparece o menu **Plataforma**.
-2. **Cadastre o cliente** em **Plataforma > Empresas > Nova empresa** (nome, CPF/CNPJ, responsável).
-   Os planos PETLOVE, PETLIFE, DOGLIFE e CATLIFE já vêm cadastrados.
-3. **Libere o administrador da clínica.** Ele cria a conta no app e preenche o pedido de acesso.
-   Em **Plataforma > Liberações**, toque em **Liberar**, escolha a empresa e o perfil
-   **Administrador**. (Dá também para criar a empresa direto nessa tela.)
-4. **A equipe da clínica.** O administrador da clínica convida as pessoas em
-   **Configurações > Equipe > Convidar pessoa**; quem cria a conta com o e-mail convidado entra
-   direto, sem passar por você. Quem se cadastra sem convite cai em **Liberações** para você decidir.
-5. **Bloquear.** Em **Plataforma > Empresas**, **Suspender acesso** tira todos da empresa na hora
-   (os dados ficam guardados). Para uma pessoa só, desligue o acesso dela na mesma tela.
-6. Em **Configurações > Clínica**, o administrador ajusta horário de atendimento e intervalo.
-
-## Parte 4: instalar o APK no Android
-
-1. No celular, abra o link do **Pontual.apk** (Releases) e baixe.
-2. Toque no arquivo baixado. O Android pede permissão para "instalar apps desta fonte":
-   permita para o navegador ou gerenciador de arquivos.
-3. Instale e abra o **VetCare**.
-
-O aviso do Play Protect sobre "app desconhecido" é normal para apps fora da Play Store.
-Para publicar na Play Store depois, é preciso uma conta de desenvolvedor Google (taxa única) e
-um APK assinado; dá para preparar quando chegar a hora.
-
-iPhone: use o site no Safari e toque em **Compartilhar > Adicionar à Tela de Início**.
+- Site: `https://SEU-USUARIO.github.io/pontual/`
+- APK: página **Releases** do repositório, arquivo **Pontual.apk**
 
 ---
 
-## Perfis de acesso
+## 1. Banco de dados (uma vez)
+
+1. Crie o projeto no Supabase (região **South America (São Paulo)**).
+2. No **SQL Editor**, rode em ordem os arquivos de `supabase/migrations/` (`0001` a `0006`).
+   Cada um: **New query**, colar, **Run**. O aviso "Potential issue detected" é esperado: **Run query**.
+3. Em **Authentication > Sign In / Providers**, desligue **Confirm email**.
+4. Em **Project Settings > API Keys**, copie a **Publishable key** (`sb_publishable_...`).
+   Nunca use as "Secret keys" no app.
+
+## 2. Secrets do GitHub (uma vez)
+
+Em **Settings > Secrets and variables > Actions > New repository secret**:
+
+| Nome | Valor |
+|---|---|
+| `VITE_SUPABASE_URL` | endereço do projeto (`https://xxxx.supabase.co`) |
+| `VITE_SUPABASE_ANON_KEY` | a Publishable key |
+| `ANDROID_KEY_PASSWORD` | senha longa sua (16+ caracteres). Protege a chave que assina o app. **Guarde fora do GitHub.** |
+| `SUPABASE_DB_URL` | endereço de conexão do banco, para o backup (seção 6) |
+| `BACKUP_PASSWORD` | outra senha longa sua (16+). Criptografa os backups. **Guarde fora do GitHub.** |
+
+Depois: **Settings > Pages > Source: GitHub Actions**, e rode uma vez em **Actions** o workflow
+**Criar chave de assinatura (uma vez)**.
+
+## 3. Como atualizar o sistema
+
+1. Receba o novo `vetcare.zip` (não descompacte).
+2. No repositório: **Add file > Upload files**, arraste o zip, **Commit changes**.
+3. Pronto. Em sequência, sozinhos:
+   - **Aplicar atualização (zip)** desempacota (1 min);
+   - **Publicar (testes, site e APK)** roda os testes do banco e de tela; **se algum falhar, nada é publicado**;
+   - o site é atualizado e o APK novo vai para **Releases**.
+4. Mudanças no banco vêm como arquivos novos em `supabase/migrations/` e são rodadas no SQL Editor.
+
+Quem usa o APK vê no app o aviso **"Nova versão disponível"**, com o botão **Atualizar**.
+Basta instalar por cima; nada se perde.
+
+## 4. Quem pode entrar
+
+- Criar conta **não** dá acesso. A pessoa aceita os termos, pede acesso e espera.
+- **Dono da plataforma** (você): menu **Plataforma**.
+  - **Liberações**: aprova (escolhendo empresa e perfil) ou recusa, com motivo.
+  - **Empresas**: cadastra clientes, troca perfis, bloqueia pessoas, **suspende** a empresa inteira.
+  - **Atendimentos**: vê, só leitura, os atendimentos de todas as empresas ou de uma (suporte).
+  - **Registro**: tudo o que foi consultado ou alterado pela plataforma, com data e responsável.
+- **Administrador da clínica**: convida a própria equipe em **Configurações > Equipe**; quem cria a conta
+  com o e-mail convidado entra direto.
+
+Para tornar outra conta dona da plataforma (SQL Editor):
+```sql
+insert into public.platform_admins (user_id) select id from auth.users where email = 'email@da.conta';
+```
+
+### Perfis
 
 | Ação | Admin | Recepção | Veterinário |
 |---|:-:|:-:|:-:|
 | Ver painel, agenda e pacientes | ✓ | ✓ | ✓ |
-| Agendar e editar | ✓ | ✓ | |
+| Agendar, editar, enviar lembretes | ✓ | ✓ | |
 | Concluir e escrever observações clínicas | ✓ | ✓ | ✓ |
 | Cancelar, registrar falta, reabrir | ✓ | ✓ | |
 | Excluir agendamento | ✓ | | |
 | Equipe, planos e dados da clínica | ✓ | | |
 
-## Perguntas comuns
+## 5. No dia a dia
 
-**Alguém esqueceu a senha.** O administrador abre **Configurações > Equipe > Redefinir senha**,
-o app sugere uma senha temporária e mostra para passar à pessoa. Ela entra e troca pela dela no
-ícone de chave ao lado do nome. (O e-mail gratuito do Supabase só entrega para a própria conta do
-projeto, por isso a recuperação é feita pelo administrador e não por e-mail.)
-Se o próprio administrador esquecer: no Supabase, **Authentication > Users**, apague o usuário dele,
-crie a conta de novo pelo app e, no **SQL Editor**, rode
-`update public.members set user_id = (select id from auth.users where email = 'SEU@EMAIL') where email = 'SEU@EMAIL';`
+- **Agenda por veterinário:** escolhendo o veterinário, o horário fica ocupado só para ele.
+  "Sem preferência" ocupa o horário da clínica toda.
+- **Lembretes:** na Agenda, **Lembretes de amanhã** lista os pacientes do dia seguinte; **Enviar** abre o
+  WhatsApp com a mensagem pronta e marca como enviado.
+- **Senha esquecida:** o administrador da clínica usa **Configurações > Equipe > Redefinir senha**.
 
-**Agenda de cada veterinário.** Na Agenda, o seletor de veterinário mostra só os atendimentos
-dele. Quem entra com perfil Veterinário já abre na própria agenda.
+## 6. Backup
 
-**Uma pessoa saiu da equipe.** Configurações > Equipe > desligue o acesso. Ela sai de
-todos os aparelhos na hora e o histórico do que ela fez continua.
+Todo domingo às 3h o GitHub salva uma cópia do banco, **criptografada**, guardada por 90 dias
+(**Actions > Backup semanal do banco > execução > Artifacts**). Para rodar na hora: **Run workflow**.
 
-**Backup.** O Supabase faz backup diário automático. Para ter uma cópia sua:
-**Table Editor**, escolha a tabela e **Export > CSV**.
+**Endereço do banco (`SUPABASE_DB_URL`):** no Supabase, botão **Connect** (topo) > **Session pooler**.
+Copie o endereço e troque `[YOUR-PASSWORD]` pela senha do banco (se não tiver, **Project Settings >
+Database > Reset database password**).
 
-**Limites do plano gratuito.** 500 MB de banco (dá para centenas de milhares de agendamentos)
-e até 50 mil usuários. Projetos sem nenhum acesso por 7 dias são pausados; basta abrir o painel
-do Supabase e clicar em **Restore**. Com uso diário da clínica, isso não acontece.
+**Restaurar** (só em emergência, num banco novo):
+```bash
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -in pontual-AAAA-MM-DD.sql.gz.enc -pass pass:SUA_BACKUP_PASSWORD | gunzip > backup.sql
+psql "ENDERECO_DO_BANCO_NOVO" -f backup.sql
+```
 
-**Por que não Google Sheets ou Excel online?** Planilha não impede dois atendentes de
-marcarem o mesmo horário ao mesmo tempo, não tem login com perfis e qualquer pessoa com o
-link vê ou apaga tudo. O Supabase é um banco de dados de verdade (PostgreSQL), também gratuito,
-e dá para exportar tudo para planilha quando quiser.
+## 7. LGPD
+
+- Termos de uso e política de privacidade ficam no app (versão em `app/src/pages/Legal.tsx`, `TERMS_VERSION`).
+  Cada pessoa aceita ao criar a conta; o aceite fica registrado com data e versão.
+- Mudou o texto? Troque `TERMS_VERSION` (ex.: `2027-01`): todos aceitam de novo no próximo acesso.
+- O texto é um modelo: **revise com um advogado** e alinhe com o contrato das clínicas, principalmente
+  o acesso de leitura do dono da plataforma (seção 4) e o e-mail de contato (`CONTACT_EMAIL`).
+
+## Problemas comuns
+
+| O que acontece | O que fazer |
+|---|---|
+| Publicar ficou vermelho em "tests" | Algo quebrou; nada foi publicado. Abra a execução e mande o print. |
+| O app não mostra o aviso de versão nova | O aviso confere no máximo a cada 6 horas. Feche e abra o app mais tarde. |
+| Backup vermelho | Confira `SUPABASE_DB_URL` (Session pooler, com a senha) e `BACKUP_PASSWORD`. |
+| Supabase "paused" | Projeto sem uso por 7 dias. Abra o painel e clique em **Restore**. |

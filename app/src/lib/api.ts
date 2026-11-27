@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Appointment, Bootstrap, Company, CompanyDetail, PlatformRequest, Slot, TutorDetail, TutorSummary } from './types';
+import type { Appointment, AuditEntry, Bootstrap, Company, CompanyDetail, OverviewRow, PlatformAppointment, PlatformRequest, Slot, TutorDetail, TutorSummary } from './types';
 
 /** Error returned by the database API: message for the user + per-field messages. */
 export class ApiError extends Error {
@@ -45,8 +45,10 @@ export const api = {
       p_limit: p.limit ?? 50, p_cursor: p.cursor ?? null
     }),
   getAppointment: (id: string) => rpc<Appointment>('get_appointment', { p_id: id }),
-  slots: (date: string, exclude?: string | null) =>
-    rpc<{ date: string; past_day: boolean; slots: Slot[] }>('get_slots', { p_date: date, p_exclude: exclude ?? null }),
+  slots: (date: string, exclude?: string | null, vet?: string | null) =>
+    rpc<{ date: string; vet_id: string | null; past_day: boolean; slots: Slot[] }>('get_slots', { p_date: date, p_exclude: exclude ?? null, p_vet: vet || null }),
+  markReminderSent: (id: string) => rpc<Appointment>('mark_reminder_sent', { p_id: id }),
+  acceptTerms: (version: string) => rpc<Bootstrap>('accept_terms', { p_version: version }),
   saveAppointment: (id: string | null, payload: Record<string, unknown>) =>
     rpc<Appointment>('save_appointment', { p_id: id, p: payload }),
   setStatus: (id: string, status: string) => rpc<Appointment>('set_appointment_status', { p_id: id, p_status: status }),
@@ -79,6 +81,15 @@ export const api = {
     rpc<PlatformRequest[]>('platform_decide_request', {
       p_id: id, p_approve: approve, p_clinic_id: opts.clinicId ?? null, p_role: opts.role ?? null, p_reason: opts.reason ?? null
     }),
+
+  platformAppointments: (p: ListParams & { clinic?: string | null }) =>
+    rpc<{ data: PlatformAppointment[]; next_cursor: string | null }>('platform_list_appointments', {
+      p_clinic: p.clinic || null, p_from: p.from ?? null, p_to: p.to ?? null, p_date: p.date ?? null,
+      p_status: p.status || null, p_q: p.q || null, p_order: p.order ?? 'asc', p_limit: p.limit ?? 50, p_cursor: p.cursor ?? null
+    }),
+  platformAppointment: (id: string) => rpc<PlatformAppointment>('platform_get_appointment', { p_id: id }),
+  platformOverview: () => rpc<{ companies: OverviewRow[] }>('platform_overview'),
+  platformAudit: (before?: number | null, limit = 100) => rpc<AuditEntry[]>('platform_list_audit', { p_limit: limit, p_before: before ?? null }),
 
   updateMember: (id: string, role?: string, active?: boolean) =>
     rpc<any>('update_member', { p_id: id, p_role: role ?? null, p_active: active ?? null })

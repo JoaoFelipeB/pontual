@@ -46,7 +46,7 @@ export async function seed() {
   const owner = await signUp('dono@demo.com', 'dono12345');
   await db.query('insert into public.platform_admins (user_id) values ($1)', [owner.id]);
   const company = await rpc(owner.id, 'platform_save_company', { p_id: null, p: { name: 'Clínica Veterinária Amigo Fiel', document: '12345678000190', contact_name: 'Ana Souza', contact_phone: '83988880000' } });
-  await rpc(owner.id, 'platform_save_company', { p_id: null, p: { name: 'PetVida Centro Veterinário', contact_name: 'Roberto Nunes' } });
+  const petvida = await rpc(owner.id, 'platform_save_company', { p_id: null, p: { name: 'PetVida Centro Veterinário', contact_name: 'Roberto Nunes' } });
   const admin = await signUp('admin@demo.com', 'admin12345');
   await rpc(admin.id, 'request_access', { p_name: 'Ana Souza', p_phone: '83988880000', p_company_hint: 'Amigo Fiel' });
   const req = (await rpc(owner.id, 'platform_list_requests', { p_status: 'pending' }))[0];
@@ -78,6 +78,18 @@ export async function seed() {
     await db.query('update public.appointments set starts_on = $1 where id = $2', [realDate, r.id]);
     if (_st !== 'agendado') await db.query('update public.appointments set status = $1 where id = $2', [_st, r.id]);
   }
+  // second client with its own agenda
+  const rob = await signUp('roberto@petvida.com', 'roberto123');
+  await rpc(rob.id, 'request_access', { p_name: 'Roberto Nunes', p_phone: '83977770000', p_company_hint: 'PetVida' });
+  const r2 = (await rpc(owner.id, 'platform_list_requests', { p_status: 'pending' }))[0];
+  await rpc(owner.id, 'platform_decide_request', { p_id: r2.id, p_approve: true, p_clinic_id: petvida.id, p_role: 'admin' });
+  for (const [an, tn, ph, sp, t] of [['Bolinha', 'Sandra Lima', '83911110000', 'cao', '15:00'], ['Mingau', 'Paulo Reis', '83922220000', 'gato', '16:30']]) {
+    const x = await rpc(rob.id, 'save_appointment', { p_id: null, p: { tutor_name: tn, tutor_phone: ph, animal_name: an, species: sp, date: add(1), time: '09:00', service_type: 'particular', reason: 'Consulta' } });
+    await db.query('update public.appointments set starts_on = $1, starts_at = $2 where id = $3', [add(0), t, x.id]);
+  }
+  // seeded users already accepted the current terms (keep in sync with TERMS_VERSION in app/src/pages/Legal.tsx)
+  await db.exec(`insert into public.user_consents (user_id, document, version)
+                 select id, d, '2026-11' from auth.users, unnest(array['terms','privacy']) d on conflict do nothing`);
   // some history
   const hist = [[-12, '10:00', 'Bidu', 'Vermifugação'], [-40, '09:00', 'Bidu', 'Vacina V10'], [-20, '16:00', 'Thor', 'Consulta']];
   for (const [n, t, an, reason] of hist) {

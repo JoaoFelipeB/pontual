@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { Spinner, Toaster } from './components/ui';
 import { AccessPage, LoginPage, NewPasswordPage, NotConfiguredPage } from './pages/Login';
 import { PlatformPage } from './pages/Platform';
+import { TERMS_VERSION, TermsAcceptPage } from './pages/Legal';
 import { DashboardPage } from './pages/Dashboard';
 import { AgendaPage } from './pages/Agenda';
 import { PatientDetailPage, PatientsPage } from './pages/Patients';
@@ -19,6 +20,7 @@ function Gate() {
     <div className="boot"><div className="auth-card"><h2>Não foi possível carregar</h2><p className="muted">{error}</p>
       <button className="btn btn-primary btn-md block" onClick={refresh}>Tentar de novo</button></div></div>
   );
+  if (boot.terms_version !== TERMS_VERSION) return <TermsAcceptPage />;
   if (!boot.member && !boot.platform_admin) return <AccessPage />;
   if (!boot.member) {
     // platform owner without a clinic of their own: only the platform area

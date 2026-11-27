@@ -160,13 +160,13 @@ export function AppointmentForm({ open, edit, preset, onClose, onSaved }: Props)
                 onChange={(e) => { set('date', e.target.value); set('time', ''); }} />
             </Field>
             <Field label="Veterinário" error={errors.vet_id}>
-              <Select value={f.vet_id} onChange={(e) => set('vet_id', e.target.value)}>
+              <Select value={f.vet_id} onChange={(e) => { set('vet_id', e.target.value); set('time', ''); }}>
                 <option value="">Sem preferência</option>
                 {boot.vets.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
               </Select>
             </Field>
           </div>
-          <Slots date={f.date} value={f.time} excludeId={edit?.id} keep={edit && edit.date === f.date ? edit.time : null}
+          <Slots date={f.date} vet={f.vet_id} value={f.time} excludeId={edit?.id} keep={edit && edit.date === f.date && (edit.vet_id ?? '') === f.vet_id ? edit.time : null}
             onChange={(t) => set('time', t)} error={errors.time} />
         </section>
 
@@ -247,8 +247,8 @@ function TutorSearch({ onPick, picked, onClear }: { onPick: (t: TutorSummary) =>
 }
 
 /** Slot grid. Only the newest request for the date currently selected is drawn. */
-function Slots({ date, value, onChange, excludeId, keep, error }: {
-  date: string; value: string; onChange: (t: string) => void; excludeId?: string; keep: string | null; error?: string;
+function Slots({ date, vet, value, onChange, excludeId, keep, error }: {
+  date: string; vet: string; value: string; onChange: (t: string) => void; excludeId?: string; keep: string | null; error?: string;
 }) {
   const [data, setData] = useState<{ date: string; past_day: boolean; slots: Slot[] } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -257,10 +257,10 @@ function Slots({ date, value, onChange, excludeId, keep, error }: {
     if (!date) { setData(null); return; }
     const my = ++req.current;
     setLoading(true);
-    api.slots(date, excludeId).then((d) => {
-      if (my === req.current && d.date === date) setData(d);
+    api.slots(date, excludeId, vet).then((d) => {
+      if (my === req.current && d.date === date && (d.vet_id ?? '') === vet) setData(d);
     }).catch((e) => toast.error(e.message)).finally(() => my === req.current && setLoading(false));
-  }, [date, excludeId]);
+  }, [date, excludeId, vet]);
 
   const slots = (data?.slots ?? []).map((s) => (s.time === keep ? { ...s, available: true, reason: null } : s));
   return (

@@ -7,6 +7,7 @@ import { initials, ROLE_LABEL } from '../lib/format';
 import { Button, Drawer, Field, Input, toast } from './ui';
 import { AppointmentForm } from '../features/AppointmentForm';
 import { AppointmentDetail } from '../features/AppointmentDetail';
+import { UpdateBanner } from './UpdateBanner';
 import type { Appointment } from '../lib/types';
 
 /** Global actions any page can trigger: new/edit appointment, open details. `version` bumps after every change. */
@@ -85,7 +86,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <button className="icon-btn" onClick={() => setPwOpen(true)} aria-label="Trocar senha"><KeyRound size={17} /></button>
             <button className="icon-btn" onClick={signOut} aria-label="Sair"><LogOut size={17} /></button>
           </header>
-          <main className="content">{children}</main>
+          <main className="content"><UpdateBanner />{children}</main>
         </div>
 
         <nav className="tabbar" aria-label="Menu">

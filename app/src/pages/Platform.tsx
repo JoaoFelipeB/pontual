@@ -1,25 +1,183 @@
 import { useEffect, useState } from 'react';
-import { Building2, Check, Inbox, MessageCircle, Plus, Search, X } from 'lucide-react';
+import { Building2, CalendarDays, Check, Eye, History, Inbox, MessageCircle, Plus, Search, ShieldAlert, X } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
-import { fmtDate, initials, maskPhone, ROLE_LABEL, waLink } from '../lib/format';
-import type { Company, CompanyDetail, PlatformRequest } from '../lib/types';
-import { Button, Confirm, Drawer, Empty, Field, Input, Segmented, Select, Spinner, Textarea, toast, useDebounced } from '../components/ui';
+import { addDays, animalLine, fmtDate, fmtShort, initials, maskPhone, ROLE_LABEL, waLink } from '../lib/format';
+import type { AuditEntry, Company, CompanyDetail, OverviewRow, PlatformAppointment, PlatformRequest } from '../lib/types';
+import { Button, Confirm, Drawer, Empty, Field, Input, PlanBadge, Segmented, Select, SpeciesIcon, Spinner, StatusBadge, Textarea, toast, useDebounced } from '../components/ui';
 
-type Tab = 'liberacoes' | 'empresas';
+type Tab = 'liberacoes' | 'empresas' | 'atendimentos' | 'registro';
 
-/** Platform owner area: approve access requests and manage client companies. */
+/** Platform owner area: access requests, client companies and read-only view of their appointments. */
 export function PlatformPage() {
   const [tab, setTab] = useState<Tab>('liberacoes');
+  const [clinic, setClinic] = useState('');
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Plataforma</h1><p className="muted">Quem pode usar o Pontual: empresas clientes e liberação de acesso.</p></div>
+        <div><h1>Plataforma</h1><p className="muted">Empresas clientes, liberação de acesso e atendimentos de todos os clientes.</p></div>
         <Segmented label="Seção" value={tab} onChange={setTab}
-          options={[{ value: 'liberacoes', label: 'Liberações' }, { value: 'empresas', label: 'Empresas' }]} />
+          options={[{ value: 'liberacoes', label: 'Liberações' }, { value: 'empresas', label: 'Empresas' }, { value: 'atendimentos', label: 'Atendimentos' }, { value: 'registro', label: 'Registro' }]} />
       </div>
-      {tab === 'liberacoes' ? <Requests /> : <Companies />}
+      {tab === 'liberacoes' && <Requests />}
+      {tab === 'empresas' && <Companies onSupport={(id) => { setClinic(id); setTab('atendimentos'); }} />}
+      {tab === 'atendimentos' && <Appointments clinic={clinic} setClinic={setClinic} />}
+      {tab === 'registro' && <AuditLog />}
     </div>
+  );
+}
+
+// =================================================================== appointments (all companies, read-only)
+
+/** Today in Brazil (the owner may not belong to a clinic with its own time zone). */
+const todayBR = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+
+function Appointments({ clinic, setClinic }: { clinic: string; setClinic: (id: string) => void }) {
+  const today = todayBR();
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [overview, setOverview] = useState<OverviewRow[] | null>(null);
+  const [period, setPeriod] = useState<'hoje' | 'proximos' | 'anteriores'>('hoje');
+  const [status, setStatus] = useState('');
+  const [q, setQ] = useState('');
+  const dq = useDebounced(q, 400);
+  const [items, setItems] = useState<PlatformAppointment[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.platformCompanies().then(setCompanies).catch(() => {});
+    api.platformOverview().then((o) => setOverview(o.companies)).catch((e) => toast.error(e.message));
+  }, []);
+
+  const params = {
+    clinic, status, q: dq, limit: 50,
+    ...(period === 'hoje' ? { date: today, order: 'asc' as const }
+      : period === 'proximos' ? { from: addDays(today, 1), order: 'asc' as const }
+      : { to: addDays(today, -1), order: 'desc' as const })
+  };
+  useEffect(() => {
+    let live = true;
+    setItems(null);
+    api.platformAppointments(params).then((r) => { if (live) { setItems(r.data); setCursor(r.next_cursor); } })
+      .catch((e) => toast.error(e.message));
+    return () => { live = false; };
+  }, [clinic, period, status, dq]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadMore() {
+    setMore(true);
+    try { const r = await api.platformAppointments({ ...params, cursor }); setItems((x) => [...(x ?? []), ...r.data]); setCursor(r.next_cursor); }
+    catch (e: any) { toast.error(e.message); } finally { setMore(false); }
+  }
+
+  const selected = companies.find((c) => c.id === clinic);
+  return (
+    <>
+      <div className="notice">
+        <ShieldAlert size={18} />
+        <span><b>Visualização da plataforma, somente leitura.</b> Nada pode ser alterado por aqui, e cada consulta fica registrada (quem viu, qual empresa e quando).</span>
+      </div>
+
+      {!clinic && (
+        <section className="card">
+          <header className="card-head"><h2>Resumo por empresa</h2><span className="muted">clique para ver os atendimentos</span></header>
+          {!overview ? <Spinner /> : !overview.length ? <p className="muted pad">Nenhuma empresa cadastrada.</p> : (
+            <table className="table">
+              <thead><tr><th>Empresa</th><th>Hoje</th><th className="hide-sm">Próx. 7 dias</th><th className="hide-sm">Concluídos no mês</th><th className="hide-md">Faltas no mês</th></tr></thead>
+              <tbody>
+                {overview.map((o) => (
+                  <tr key={o.id} onClick={() => setClinic(o.id)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setClinic(o.id)} className={o.active ? '' : 'is-off'}>
+                    <td><b>{o.name}</b>{!o.active && <small className="muted"> (suspensa)</small>}</td>
+                    <td className="num">{o.today}</td>
+                    <td className="hide-sm num">{o.next_7d}</td>
+                    <td className="hide-sm num">{o.month_done}</td>
+                    <td className="hide-md num">{o.month_noshow}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
+
+      <section className="card list-card">
+        <div className="filters">
+          <Select value={clinic} onChange={(e) => setClinic(e.target.value)} aria-label="Empresa">
+            <option value="">Todas as empresas</option>
+            {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+          <Segmented label="Período" value={period} onChange={setPeriod}
+            options={[{ value: 'hoje', label: 'Hoje' }, { value: 'proximos', label: 'Próximos' }, { value: 'anteriores', label: 'Anteriores' }]} />
+          <Select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+            <option value="">Todos os status</option>
+            <option value="agendado">Agendados</option><option value="concluido">Concluídos</option>
+            <option value="faltou">Faltas</option><option value="cancelado">Cancelados</option>
+          </Select>
+          <div className="search-box">
+            <Search size={16} />
+            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Animal, tutor ou telefone" aria-label="Buscar" />
+          </div>
+        </div>
+        {selected && <div className="support-bar"><Eye size={16} />Suporte: vendo só <b>{selected.name}</b><button className="link" onClick={() => setClinic('')}>ver todas</button></div>}
+
+        {!items ? <Spinner /> : !items.length ? (
+          <Empty icon={<CalendarDays size={22} />} title="Nenhum atendimento encontrado" text="Mude o período, a empresa ou a busca." />
+        ) : (
+          <>
+            <table className="table">
+              <thead><tr><th>Data</th>{!clinic && <th>Empresa</th>}<th>Paciente</th><th className="hide-sm">Tutor</th><th>Status</th></tr></thead>
+              <tbody>
+                {items.map((a) => (
+                  <tr key={a.id} onClick={() => setOpen(a.id)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOpen(a.id)}>
+                    <td className="nowrap"><b className="num">{fmtShort(a.date)}</b> <span className="muted num">{a.time}</span></td>
+                    {!clinic && <td className="muted">{a.clinic.name}</td>}
+                    <td><span className="cell-pet"><SpeciesIcon species={a.animal.species} size={16} />{a.animal.name}</span></td>
+                    <td className="hide-sm"><span className="cell-two"><span>{a.tutor.name}</span><small>{a.tutor.phone}</small></span></td>
+                    <td><StatusBadge status={a.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {cursor && <div className="table-more"><Button onClick={loadMore} loading={more}>Carregar mais</Button></div>}
+          </>
+        )}
+      </section>
+      <ReadOnlyDetail id={open} onClose={() => setOpen(null)} />
+    </>
+  );
+}
+
+function ReadOnlyDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const [a, setA] = useState<PlatformAppointment | null>(null);
+  useEffect(() => {
+    setA(null);
+    if (id) api.platformAppointment(id).then(setA).catch((e) => { toast.error(e.message); onClose(); });
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Drawer open={!!id} onClose={onClose} title={a ? (
+      <div className="detail-title"><SpeciesIcon species={a.animal.species} size={20} /><div><h2>{a.animal.name}</h2><small>{a.clinic.name} | Nº {a.number}</small></div></div>
+    ) : <h2>Atendimento</h2>} footer={<Button onClick={onClose}>Fechar</Button>}>
+      {!a ? <Spinner /> : (
+        <div className="detail">
+          <div className="detail-when">
+            <div><b>{a.time}</b><span>{fmtDate(a.date)}</span></div>
+            <StatusBadge status={a.status} />
+          </div>
+          <dl className="dl">
+            <dt>Empresa</dt><dd>{a.clinic.name}</dd>
+            <dt>Animal</dt><dd>{animalLine(a.animal) || '—'}</dd>
+            <dt>Tutor</dt><dd>{a.tutor.name}</dd>
+            <dt>Telefone</dt><dd>{a.tutor.phone}</dd>
+            <dt>Atendimento</dt><dd><PlanBadge plan={a.plan_name} /></dd>
+            <dt>Motivo</dt><dd>{a.reason || '—'}</dd>
+            <dt>Veterinário</dt><dd>{a.vet_name || 'Sem preferência'}</dd>
+            <dt>Agendado por</dt><dd>{a.created_by_name || '—'}</dd>
+            <dt>Observações</dt><dd>{a.notes || '—'}</dd>
+          </dl>
+          <p className="muted small-note">Somente leitura. Alterações são feitas pela própria clínica.</p>
+        </div>
+      )}
+    </Drawer>
   );
 }
 
@@ -174,7 +332,7 @@ function ApproveDrawer({ request, onClose, onDone }: { request: PlatformRequest 
 
 // =================================================================== companies
 
-function Companies() {
+function Companies({ onSupport }: { onSupport: (companyId: string) => void }) {
   const [q, setQ] = useState('');
   const dq = useDebounced(q, 300);
   const [items, setItems] = useState<Company[] | null>(null);
@@ -209,14 +367,16 @@ function Companies() {
           </tbody>
         </table>
       )}
-      <CompanyDrawer id={open} onClose={() => setOpen(null)} onChanged={load} />
+      <CompanyDrawer id={open} onClose={() => setOpen(null)} onChanged={load} onSupport={(cid) => { setOpen(null); onSupport(cid); }} />
     </section>
   );
 }
 
 const EMPTY_COMPANY = { name: '', document: '', contact_name: '', contact_phone: '', notes: '', active: true };
 
-function CompanyDrawer({ id, onClose, onChanged }: { id: string | 'new' | null; onClose: () => void; onChanged: () => void }) {
+function CompanyDrawer({ id, onClose, onChanged, onSupport }: {
+  id: string | 'new' | null; onClose: () => void; onChanged: () => void; onSupport: (companyId: string) => void;
+}) {
   const [detail, setDetail] = useState<CompanyDetail | null>(null);
   const [f, setF] = useState(EMPTY_COMPANY);
   const [err, setErr] = useState<Record<string, string>>({});
@@ -271,6 +431,17 @@ function CompanyDrawer({ id, onClose, onChanged }: { id: string | 'new' | null; 
             {!isNew && detail && (
               <>
                 <section className="form-section">
+                  <h3>Atendimentos</h3>
+                  <div className="suspend-row">
+                    <div>
+                      <b>{detail.appointments_30d} agendamento{detail.appointments_30d === 1 ? '' : 's'} criados nos últimos 30 dias</b>
+                      <small className="muted">Veja a agenda desta empresa em modo suporte, só leitura.</small>
+                    </div>
+                    <Button icon={<Eye size={16} />} onClick={() => onSupport(detail.id)}>Ver atendimentos</Button>
+                  </div>
+                </section>
+
+                <section className="form-section">
                   <h3>Situação</h3>
                   <div className="suspend-row">
                     <div>
@@ -315,5 +486,60 @@ function CompanyDrawer({ id, onClose, onChanged }: { id: string | 'new' | null; 
         text="Todas as pessoas desta empresa perdem o acesso na hora, em todos os aparelhos. Os dados ficam guardados e voltam ao reativar."
         onCancel={() => setConfirmSuspend(false)} onConfirm={() => save({ ...f, active: false })} />
     </>
+  );
+}
+
+// =================================================================== audit log
+
+const ACTION_LABEL: Record<string, string> = {
+  view_appointments: 'Consultou atendimentos', view_appointment: 'Abriu um atendimento',
+  approve: 'Liberou acesso', reject: 'Recusou acesso', create: 'Cadastrou empresa',
+  update: 'Alterou dados', suspend: 'Suspendeu empresa', reactivate: 'Reativou empresa'
+};
+
+function describe(e: AuditEntry) {
+  const d = (e.data ?? {}) as Record<string, string>;
+  if (e.action === 'view_appointments') {
+    const parts = [d.scope === 'all_companies' ? 'todas as empresas' : e.company ?? 'uma empresa'];
+    if (d.date) parts.push(`dia ${fmtDate(d.date)}`);
+    if (d.from) parts.push(`a partir de ${fmtDate(d.from)}`);
+    if (d.to) parts.push(`até ${fmtDate(d.to)}`);
+    if (d.q) parts.push(`busca "${d.q}"`);
+    return parts.join(', ');
+  }
+  if (e.entity === 'member') return `pessoa${d.role ? `, perfil ${ROLE_LABEL[d.role] ?? d.role}` : ''}${d.active === undefined || d.active === null ? '' : String(d.active) === 'true' ? ', acesso liberado' : ', acesso bloqueado'}`;
+  if (e.action === 'reject' && d.reason) return `motivo: ${d.reason}`;
+  return e.company ?? '';
+}
+
+/** Everything the platform owner did, newest first (read-only). */
+function AuditLog() {
+  const [items, setItems] = useState<AuditEntry[] | null>(null);
+  const [more, setMore] = useState(false);
+  const [done, setDone] = useState(false);
+  useEffect(() => { api.platformAudit(null, 100).then((r) => { setItems(r); setDone(r.length < 100); }).catch((e) => toast.error(e.message)); }, []);
+  async function loadMore() {
+    if (!items?.length) return;
+    setMore(true);
+    try { const r = await api.platformAudit(items[items.length - 1].id, 100); setItems([...items, ...r]); setDone(r.length < 100); }
+    catch (e: any) { toast.error(e.message); } finally { setMore(false); }
+  }
+  return (
+    <section className="card list-card">
+      <header className="card-head"><h2><History size={18} /> Registro de acessos e ações</h2><span className="muted">mais recentes primeiro</span></header>
+      {!items ? <Spinner /> : !items.length ? <Empty icon={<History size={22} />} title="Nada registrado ainda" /> : (
+        <>
+          <ul className="audit-list">
+            {items.map((e) => (
+              <li key={e.id}>
+                <time>{new Date(e.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</time>
+                <span><b>{ACTION_LABEL[e.action] ?? e.action}</b>{describe(e) ? `: ${describe(e)}` : ''}<br /><small>por {e.actor ?? 'sistema'}</small></span>
+              </li>
+            ))}
+          </ul>
+          {!done && <div className="table-more"><Button onClick={loadMore} loading={more}>Carregar mais</Button></div>}
+        </>
+      )}
+    </section>
   );
 }

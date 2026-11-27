@@ -20,6 +20,8 @@ export interface Bootstrap {
   /** set when the user has a membership that is currently blocked */
   blocked?: 'company_suspended' | 'member_disabled' | null;
   access_request?: AccessRequest | null;
+  /** last version of the terms of use accepted by this user */
+  terms_version: string | null;
   permissions: string[];
   clinic: Clinic;
   today: string;
@@ -40,6 +42,7 @@ export interface Appointment {
   tutor: { id: string; name: string; phone: string };
   animal: Animal;
   created_at: string; updated_at: string; created_by_name: string | null;
+  reminder_sent_at: string | null;
 }
 
 export interface Slot { time: string; available: boolean; reason: 'ocupado' | 'passado' | null; animal_name: string | null; appointment_id: string | null }
@@ -60,4 +63,11 @@ export interface PlatformRequest {
   id: string; email: string; name: string; phone: string | null; company_hint: string | null; message: string | null;
   status: 'pending' | 'approved' | 'rejected'; reject_reason: string | null; created_at: string; decided_at: string | null;
   clinic_name: string | null;
+}
+
+export interface PlatformAppointment extends Appointment { clinic: { id: string; name: string } }
+export interface OverviewRow { id: string; name: string; active: boolean; today: number; next_7d: number; month_done: number; month_noshow: number }
+export interface AuditEntry {
+  id: number; created_at: string; action: string; entity: string; entity_id: string | null;
+  actor: string | null; company: string | null; data: Record<string, unknown> | null;
 }

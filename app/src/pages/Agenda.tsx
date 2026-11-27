@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search, Stethoscope } from 'lucide-react';
+import { BellRing, CalendarDays, Check, ChevronLeft, ChevronRight, MessageCircle, Plus, Search, Stethoscope } from 'lucide-react';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
-import { addDays, fmtLong, fmtShort, fmtWeekday, relDay } from '../lib/format';
+import { addDays, fmtDate, fmtLong, fmtShort, fmtWeekday, relDay, waLink } from '../lib/format';
 import type { Appointment, Slot } from '../lib/types';
-import { Button, Empty, PlanBadge, Segmented, Select, SpeciesIcon, Spinner, StatusBadge, toast, useDebounced } from '../components/ui';
+import { Button, Drawer, Empty, PlanBadge, Segmented, Select, SpeciesIcon, Spinner, StatusBadge, toast, useDebounced } from '../components/ui';
 import { useWorkspace } from '../components/Layout';
 
 export function AgendaPage() {
@@ -38,12 +38,12 @@ function DayView() {
   useEffect(() => {
     let live = true;
     setLoading(true);
-    Promise.all([api.slots(date), api.listAppointments({ date, limit: 200 })])
+    Promise.all([api.slots(date, null, vet), api.listAppointments({ date, limit: 200 })])
       .then(([s, l]) => { if (live && s.date === date) { setSlots(s.slots); setAll(l.data); } })
       .catch((e) => toast.error(e.message))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, [date, ws.version]);
+  }, [date, vet, ws.version]);
 
   const rows = useMemo(() => {
     const times = new Set([...(slots ?? []).map((s) => s.time), ...items.map((a) => a.time)]);
@@ -57,6 +57,7 @@ function DayView() {
   const count = (s: string) => items.filter((a) => a.status === s).length;
   const free = (slots ?? []).filter((s) => s.available).length;
   const isPast = date < boot!.today;
+  const [reminders, setReminders] = useState(false);
 
   return (
     <div className="day">
@@ -136,9 +137,66 @@ function DayView() {
               Agendar neste dia
             </Button>
           )}
+          {can('agenda.write') && (
+            <Button icon={<BellRing size={16} />} onClick={() => setReminders(true)} className="block">
+              Lembretes de amanhã
+            </Button>
+          )}
         </aside>
       </div>
+      <RemindersDrawer open={reminders} onClose={() => setReminders(false)} />
     </div>
+  );
+}
+
+/** Tomorrow's appointments with a one-tap WhatsApp reminder each; marks who already got it. */
+function RemindersDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { boot } = useSession();
+  const ws = useWorkspace();
+  const tomorrow = addDays(boot!.today, 1);
+  const [items, setItems] = useState<Appointment[] | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setItems(null);
+    api.listAppointments({ date: tomorrow, status: 'agendado', limit: 200 }).then((r) => setItems(r.data)).catch((e) => toast.error(e.message));
+  }, [open, tomorrow]);
+
+  const message = (a: Appointment) =>
+    `Olá, ${a.tutor.name.split(' ')[0]}! Lembrete da ${boot!.clinic.name}: ${a.animal.name} tem atendimento amanhã (${fmtDate(a.date)}) às ${a.time}${a.vet_name ? ` com ${a.vet_name}` : ''}. Pode confirmar a presença respondendo esta mensagem?`;
+
+  async function sent(a: Appointment) {
+    try {
+      const r = await api.markReminderSent(a.id);
+      setItems((xs) => xs?.map((x) => (x.id === a.id ? r : x)) ?? null);
+      ws.changed();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  const pending = items?.filter((a) => !a.reminder_sent_at).length ?? 0;
+  return (
+    <Drawer open={open} onClose={onClose} title={<><h2>Lembretes de amanhã</h2><small>{fmtLong(tomorrow)}</small></>}
+      footer={<Button onClick={onClose}>Fechar</Button>}>
+      {!items ? <Spinner /> : !items.length ? (
+        <Empty icon={<BellRing size={22} />} title="Nenhum atendimento amanhã" />
+      ) : (
+        <div className="form-section">
+          <p className="muted">{pending ? `${pending} lembrete${pending === 1 ? '' : 's'} para enviar.` : 'Todos os lembretes foram enviados.'} Toque em <b>Enviar</b>: o WhatsApp abre com a mensagem pronta.</p>
+          <ul className="reminders">
+            {items.map((a) => (
+              <li key={a.id} className={a.reminder_sent_at ? 'is-sent' : ''}>
+                <span className="num time">{a.time}</span>
+                <span className="grow"><b>{a.animal.name}</b><small>{a.tutor.name} | {a.tutor.phone}</small></span>
+                {a.reminder_sent_at
+                  ? <span className="sent"><Check size={15} /> Enviado</span>
+                  : <a className="btn btn-primary btn-sm" href={`${waLink(a.tutor.phone)}?text=${encodeURIComponent(message(a))}`}
+                      target="_blank" rel="noopener noreferrer" onClick={() => sent(a)}><MessageCircle size={15} /><span>Enviar</span></a>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Drawer>
   );
 }
 

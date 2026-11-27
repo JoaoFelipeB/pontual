@@ -286,6 +286,125 @@ describe('liberação de acesso pela plataforma', () => {
   });
 });
 
+describe('dono da plataforma: visão de atendimentos (suporte e geral)', () => {
+  it('só o dono acessa', async () => {
+    await expectError(admin('platform_list_appointments'), 'VC403');
+    await expectError(admin('platform_overview'), 'VC403');
+    await expectError(rec('platform_get_appointment', { p_id: (await rec('list_appointments')).data[0].id }), 'VC403');
+  });
+
+  it('visão geral: atendimentos de todas as empresas, com o nome da empresa', async () => {
+    await other('save_appointment', { p_id: null, p: appt({ animal_name: 'Fred', tutor_phone: '83955556666', time: '10:00' }) });
+    const all = await owner('platform_list_appointments', { p_limit: 200 });
+    const companies = new Set(all.data.map((a: any) => a.clinic.name));
+    expect(companies).toEqual(new Set(['Clínica Amigo Fiel', 'Outra Clínica']));
+  });
+
+  it('suporte: filtra uma empresa só, com busca e paginação', async () => {
+    const one = await owner('platform_list_appointments', { p_clinic: otherClinicId });
+    expect(one.data.every((a: any) => a.clinic.id === otherClinicId)).toBe(true);
+    expect((await owner('platform_list_appointments', { p_q: 'fred' })).data).toHaveLength(1);
+    const ids = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const r: any = await owner('platform_list_appointments', { p_clinic: clinicId, p_limit: 2, p_cursor: cursor });
+      r.data.forEach((a: any) => ids.add(a.id));
+      cursor = r.next_cursor;
+    } while (cursor);
+    expect(ids.size).toBe((await rec('list_appointments', { p_limit: 500 })).data.length);
+  });
+
+  it('detalhe e resumo por empresa', async () => {
+    const a = (await owner('platform_list_appointments', { p_clinic: otherClinicId })).data[0];
+    expect((await owner('platform_get_appointment', { p_id: a.id })).clinic.name).toBe('Outra Clínica');
+    const ov = await owner('platform_overview');
+    expect(ov.companies.map((c: any) => c.name)).toEqual(expect.arrayContaining(['Clínica Amigo Fiel', 'Outra Clínica']));
+    expect(ov.companies.find((c: any) => c.name === 'Outra Clínica').next_7d).toBeGreaterThan(0);
+  });
+
+  it('cada consulta fica registrada (uma por busca, não por página)', async () => {
+    const before = (await db.query<{ n: number }>(`select count(*)::int n from public.platform_audit where action = 'view_appointments'`)).rows[0].n;
+    const r1 = await owner('platform_list_appointments', { p_clinic: clinicId, p_limit: 1 });
+    await owner('platform_list_appointments', { p_clinic: clinicId, p_limit: 1, p_cursor: r1.next_cursor });
+    const { rows } = await db.query<{ n: number; scope: string }>(
+      `select count(*)::int n, max(data->>'scope') scope from public.platform_audit where action = 'view_appointments'`);
+    expect(rows[0].n).toBe(before + 1);
+    const views = await db.query(`select 1 from public.platform_audit where action = 'view_appointment'`);
+    expect(views.rows.length).toBeGreaterThan(0);
+  });
+});
+
+describe('pacote de melhorias', () => {
+  let vet2Id: string;
+  const D = () => addDays(today, 3);
+
+  it('agenda por veterinário: dois vets no mesmo horário; sem preferência ocupa o horário todo', async () => {
+    await admin('invite_member', { p_email: 'vet2@clinica.com', p_name: 'Joana Prado', p_role: 'veterinario' });
+    const vet2 = client(db, await signUp(db, 'vet2@clinica.com'));
+    vet2Id = (await vet2('app_bootstrap')).member.id;
+
+    await rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '13:00', vet_id: vetId }) });
+    const b = await rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '13:00', vet_id: vet2Id, animal_name: 'Rex', tutor_phone: '83912121212' }) });
+    expect(b.vet_name).toBe('Joana Prado');
+    const e = await expectError(rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '13:00', vet_id: vetId, animal_name: 'Nina', tutor_phone: '83913131313' }) }), 'VC409');
+    expect(e.message).toContain('com Paulo Lima');
+    await expectError(rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '13:00', animal_name: 'Lola', tutor_phone: '83914141414' }) }), 'VC409');
+
+    await rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '14:00', animal_name: 'Max', tutor_phone: '83915151515' }) });
+    await expectError(rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '14:00', vet_id: vet2Id, animal_name: 'Kiko', tutor_phone: '83916161616' }) }), 'VC409');
+  });
+
+  it('horários livres por veterinário', async () => {
+    const slot = async (vet: string | null, t: string) =>
+      (await rec('get_slots', { p_date: D(), p_vet: vet })).slots.find((x: any) => x.time === t);
+    expect((await slot(vetId, '13:00')).available).toBe(false);
+    expect((await slot(null, '13:00')).available).toBe(false);
+    expect((await slot(vetId, '14:00')).available).toBe(false);
+    expect((await slot(vetId, '15:00')).available).toBe(true);
+    const other = (await rec('get_slots', { p_date: D(), p_vet: vet2Id })).slots.find((x: any) => x.time === '13:00');
+    expect(other.available).toBe(false);
+  });
+
+  it('reserva simultânea do mesmo horário e vet: só uma passa', async () => {
+    const [x, y] = await Promise.allSettled([
+      rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '16:00', vet_id: vetId, animal_name: 'Zeca', tutor_phone: '83917171717' }) }),
+      rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '16:00', vet_id: vetId, animal_name: 'Teco', tutor_phone: '83918181818' }) })
+    ]);
+    expect([x.status, y.status].sort()).toEqual(['fulfilled', 'rejected']);
+  });
+
+  it('lembretes: marca enviado; mudar data/hora zera; veterinário não marca', async () => {
+    const a = await rec('save_appointment', { p_id: null, p: appt({ date: D(), time: '17:00', animal_name: 'Biscoito', tutor_phone: '83919191919' }) });
+    expect(a.reminder_sent_at).toBeNull();
+    expect((await rec('mark_reminder_sent', { p_id: a.id })).reminder_sent_at).not.toBeNull();
+    await expectError(vet('mark_reminder_sent', { p_id: a.id }), 'VC403');
+    const same = await rec('save_appointment', { p_id: a.id, p: appt({ date: D(), time: '17:00', animal_name: 'Biscoito', tutor_phone: '83919191919', notes: 'x' }) });
+    expect(same.reminder_sent_at).not.toBeNull();
+    const moved = await rec('save_appointment', { p_id: a.id, p: appt({ date: D(), time: '17:30', animal_name: 'Biscoito', tutor_phone: '83919191919' }) });
+    expect(moved.reminder_sent_at).toBeNull();
+  });
+
+  it('LGPD: aceite dos termos fica registrado por versão', async () => {
+    const u = client(db, await signUp(db, 'novo@gmail.com'));
+    expect((await u('app_bootstrap')).terms_version).toBeNull();
+    await expectError(u('accept_terms', { p_version: 'qualquer' }), 'VC422');
+    expect((await u('accept_terms', { p_version: '2026-11' })).terms_version).toBe('2026-11');
+    expect((await u('accept_terms', { p_version: '2026-11' })).terms_version).toBe('2026-11');
+    const { rows } = await db.query(`select document from public.user_consents where version = '2026-11' order by document`);
+    expect(rows.map((r: any) => r.document)).toEqual(['privacy', 'terms']);
+  });
+
+  it('registro de acessos: só o dono vê, com e-mail e empresa', async () => {
+    await expectError(admin('platform_list_audit'), 'VC403');
+    const log = await owner('platform_list_audit', { p_limit: 500 });
+    expect(log.length).toBeGreaterThan(5);
+    expect(log[0].actor).toBe('dono@pontual.com');
+    expect(log.some((l: any) => l.action === 'view_appointments' && l.company === 'Clínica Amigo Fiel')).toBe(true);
+    const older = await owner('platform_list_audit', { p_limit: 5, p_before: log[2].id });
+    expect(older.every((l: any) => l.id < log[2].id)).toBe(true);
+  });
+});
+
 describe('pacientes, painel e isolamento', () => {
   it('ficha do tutor com animais e histórico', async () => {
     const found = await rec('search_patients', { p_q: 'thor' });
@@ -303,8 +422,9 @@ describe('pacientes, painel e isolamento', () => {
   });
 
   it('outra clínica não enxerga nada desta', async () => {
-    expect((await other('list_appointments')).data).toHaveLength(0);
-    expect(await other('search_patients', { p_q: '' })).toEqual([]);
+    const mine = new Set((await rec('list_appointments', { p_limit: 500 })).data.map((a: any) => a.id));
+    expect((await other('list_appointments', { p_limit: 500 })).data.some((a: any) => mine.has(a.id))).toBe(false);
+    expect((await other('search_patients', { p_q: 'thor' }))).toEqual([]);
     const id = (await rec('list_appointments')).data[0].id;
     await expectError(other('get_appointment', { p_id: id }), 'VC404');
   });

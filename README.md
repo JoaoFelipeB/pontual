@@ -25,18 +25,22 @@ dados na nuvem com login e perfis de acesso.
   convidar a própria equipe por e-mail (o convite vale como pré-aprovação). Empresas podem
   ser suspensas, o que bloqueia todos os seus usuários na hora. Ações da plataforma ficam em
   `platform_audit`; ações das clínicas, em `audit_log`.
+- **Visão do dono.** Em Plataforma > Atendimentos o dono vê, só para leitura, os
+  atendimentos de todas as empresas ou de uma (modo suporte). Cada consulta é registrada
+  em `platform_audit` (`view_appointments` / `view_appointment`). Recomenda-se prever esse
+  acesso no contrato com as clínicas (LGPD).
 
 ## Pastas
 
 ```
-supabase/migrations/   0001 tabelas | 0002 funções e permissões | 0003 senha pelo admin | 0004 liberação de acesso
+supabase/migrations/   0001 tabelas | 0002 funções | 0003 senha pelo admin | 0004 liberação | 0005 visão da plataforma | 0006 vet, lembretes, LGPD
 app/                   React + TypeScript + Vite, empacotado como APK com Capacitor
   src/lib/             cliente Supabase, chamadas da API, sessão, formatação
   src/pages/           Painel, Agenda (dia e lista), Pacientes, Configurações, Login
   src/features/        formulário e detalhe do agendamento
   android/             projeto Android gerado pelo Capacitor (ícones e splash da marca)
-tests/                 37 testes do banco em PGlite + simulador local do Supabase
-.github/workflows/     APK, site (GitHub Pages) e testes, automáticos a cada envio
+tests/                 48 testes do banco + testes de tela (e2e/, Playwright) do banco em PGlite + simulador local do Supabase
+.github/workflows/     publish (testes > site + APK), unpack (atualização por zip), backup semanal, chave de assinatura
 ```
 
 ## Desenvolvimento local
@@ -50,14 +54,12 @@ cp .env.example .env                 # preencha URL e chave anon do Supabase
 npm run dev                          # http://localhost:5173
 ```
 
-Para testar o app inteiro sem Supabase, há um simulador local com dados de exemplo:
+Para testar o app inteiro sem Supabase, há um simulador local (o SQL real em PGlite) com dados de exemplo:
 
 ```bash
-cd app && echo "VITE_SUPABASE_URL=http://localhost:54321" > .env && echo "VITE_SUPABASE_ANON_KEY=local" >> .env
-npm run build && cd ..
-SEED=1 node tests/fake-supabase.mjs 54321 app/dist
-# abra http://localhost:54321  |  dono@demo.com / dono12345 (plataforma), admin@demo.com / admin12345,
-# rec@demo.com e vet@demo.com / senha12345
+npm run e2e:server      # abra http://localhost:54321
+# dono@demo.com / dono12345 (plataforma), admin@demo.com / admin12345, rec@demo.com e vet@demo.com / senha12345
+npm run e2e             # testes de tela, em computador e celular (sobe o simulador sozinho)
 ```
 
 ## Erros da API
