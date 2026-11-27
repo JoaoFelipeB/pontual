@@ -71,7 +71,7 @@ export function PlatformUsers() {
         </table>
       )}
       <CreateUser open={creating} companies={companies} onClose={() => setCreating(false)} onDone={() => { setCreating(false); load(); }} />
-      <EditUser user={edit} companies={companies} onClose={() => setEdit(null)} onChanged={(u) => { setEdit(u); load(); }} />
+      <EditUser key={edit?.user_id ?? 'none'} user={edit} companies={companies} onClose={() => setEdit(null)} onChanged={(u) => { setEdit(u); load(); }} />
     </section>
   );
 }
@@ -149,18 +149,13 @@ function EditUser({ user, companies, onClose, onChanged }: {
   user: PlatformUser | null; companies: Company[]; onClose: () => void; onChanged: (u: PlatformUser) => void;
 }) {
   const { boot, refresh } = useSession();
-  const [f, setF] = useState({ name: '', clinic_id: '', role: 'recepcao', active: true });
+  // filled from the user on the first render (the drawer is re-created per user, see key in PlatformUsers)
+  const [f, setF] = useState<{ name: string; clinic_id: string; role: string; active: boolean }>(() => ({ name: user?.name ?? '', clinic_id: user?.clinic_id ?? '', role: user?.role ?? 'recepcao', active: user?.active ?? true }));
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [reset, setReset] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<'remove' | 'owner' | null>(null);
   const isMe = user?.user_id === boot?.user.id;
-
-  useEffect(() => {
-    if (!user) return;
-    setF({ name: user.name ?? '', clinic_id: user.clinic_id ?? '', role: user.role ?? 'recepcao', active: user.active ?? true });
-    setErr({}); setReset(null); setConfirm(null);
-  }, [user?.user_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(key: string, fn: () => Promise<PlatformUser>, ok: string) {
     setBusy(key);
