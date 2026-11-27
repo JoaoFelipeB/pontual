@@ -126,9 +126,14 @@ test('dono cria usuário com senha temporária, edita e a pessoa entra', async (
 
   // edit: change role
   await page.getByRole('row', { name: new RegExp(email) }).click();
-  await page.getByRole('dialog').getByLabel('Perfil').selectOption('recepcao');
-  await page.getByRole('dialog').getByRole('button', { name: 'Salvar alterações' }).click();
-  await expect(page.getByText('Alterações salvas.')).toBeVisible();
+  const edit = page.getByRole('dialog');
+  await expect(edit.getByLabel('Nome')).toHaveValue('Marina Costa');
+  await expect(edit.getByLabel('Empresa').locator('option:checked')).toHaveText('PetVida Centro Veterinário');
+  await edit.getByLabel('Perfil').selectOption('recepcao');
+  await edit.getByRole('button', { name: 'Salvar alterações' }).click();
+  // show whatever message appeared, so a failure explains itself
+  await expect(page.locator('.toast').last()).toHaveText('Alterações salvas.');
+  await expect(page.getByRole('row', { name: new RegExp(email) })).toContainText('Recepção');
 
   // the person signs in with the temporary password and accepts the terms
   const p2 = await (await browser.newContext()).newPage();
