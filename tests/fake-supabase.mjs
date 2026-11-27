@@ -42,8 +42,15 @@ const userFromAuth = (req) => {
 export async function seed() {
   const today = (await db.query(`select (now() at time zone 'America/Sao_Paulo')::date::text d`)).rows[0].d;
   const add = (n) => { const d = new Date(today + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  // platform owner + one client company; the clinic admin is approved like any new user
+  const owner = await signUp('dono@demo.com', 'dono12345');
+  await db.query('insert into public.platform_admins (user_id) values ($1)', [owner.id]);
+  const company = await rpc(owner.id, 'platform_save_company', { p_id: null, p: { name: 'Clínica Veterinária Amigo Fiel', document: '12345678000190', contact_name: 'Ana Souza', contact_phone: '83988880000' } });
+  await rpc(owner.id, 'platform_save_company', { p_id: null, p: { name: 'PetVida Centro Veterinário', contact_name: 'Roberto Nunes' } });
   const admin = await signUp('admin@demo.com', 'admin12345');
-  await rpc(admin.id, 'create_clinic', { p_clinic_name: 'Clínica Veterinária Amigo Fiel', p_your_name: 'Ana Souza' });
+  await rpc(admin.id, 'request_access', { p_name: 'Ana Souza', p_phone: '83988880000', p_company_hint: 'Amigo Fiel' });
+  const req = (await rpc(owner.id, 'platform_list_requests', { p_status: 'pending' }))[0];
+  await rpc(owner.id, 'platform_decide_request', { p_id: req.id, p_approve: true, p_clinic_id: company.id, p_role: 'admin' });
   await rpc(admin.id, 'invite_member', { p_email: 'vet@demo.com', p_name: 'Dr. Paulo Lima', p_role: 'veterinario' });
   await rpc(admin.id, 'invite_member', { p_email: 'rec@demo.com', p_name: 'Carla Mendes', p_role: 'recepcao' });
   await rpc(admin.id, 'invite_member', { p_email: 'joana.vet@demo.com', p_name: 'Dra. Joana Prado', p_role: 'veterinario' });

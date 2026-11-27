@@ -27,7 +27,7 @@ Tempo estimado: 30 a 40 minutos, uma única vez.
 6. Vá em **Authentication > Sign In / Providers > Email** e desligue
    **Confirm email** (assim a equipe entra direto depois de criar a conta).
    Se preferir manter ligado, cada pessoa precisa clicar no link do e-mail antes do primeiro acesso.
-7. Rode também `supabase/migrations/0003_admin_reset_password.sql` (nova query, colar, **Run**).
+7. Rode também, nesta ordem, `0003_admin_reset_password.sql` e `0004_platform_access.sql` (nova query, colar, **Run**).
 8. Vá em **Project Settings > API** (ou **Data API**) e anote dois valores:
    - **Project URL** (algo como `https://abcdxyz.supabase.co`)
    - **anon public key** (um texto longo começando com `eyJ...`)
@@ -63,24 +63,36 @@ Tempo estimado: 30 a 40 minutos, uma única vez.
    versão maior. Quem já tem o app instala o APK novo por cima, sem perder nada.)
 
 Quando terminar:
-- **APK**: na página do repositório, menu **Releases > VetCare (última versão) > VetCare.apk**.
+- **APK**: na página do repositório, menu **Releases > VetCare (última versão) > Pontual.apk**.
 - **Site**: `https://SEU-USUARIO.github.io/vetcare/` (o endereço aparece em **Settings > Pages**).
 
-## Parte 3: primeiro acesso
+## Parte 3: primeiro acesso e controle de quem entra
 
-1. Abra o site ou instale o APK (veja a Parte 4) e toque em **Criar conta**,
-   com o seu e-mail e uma senha de pelo menos 8 caracteres.
-2. Escolha **Sou o responsável pela clínica**, informe o nome da clínica e o seu.
-   Você vira administrador. Os planos PETLOVE, PETLIFE, DOGLIFE e CATLIFE já vêm cadastrados.
-3. Em **Configurações > Clínica**, ajuste horário de atendimento e intervalo entre consultas.
-4. Em **Configurações > Equipe > Convidar pessoa**, cadastre cada pessoa com nome,
-   e-mail e perfil (Recepção, Veterinário ou Administrador).
-5. Mande para cada pessoa o link do APK (ou do site) e peça para tocar em **Criar conta**
-   usando **o mesmo e-mail do convite**. O acesso é liberado na hora, já com o perfil certo.
+Ninguém usa o app sem ser liberado. Quem cria conta cai na tela **Aguardando liberação**
+até você aprovar.
+
+1. **Torne-se dono da plataforma (uma vez).** Crie sua conta no app (**Criar conta**). Depois,
+   no Supabase, abra o **SQL Editor** e rode, trocando pelo seu e-mail:
+   ```sql
+   insert into public.platform_admins (user_id)
+   select id from auth.users where email = 'seu@email.com';
+   ```
+   Entre de novo no app: aparece o menu **Plataforma**.
+2. **Cadastre o cliente** em **Plataforma > Empresas > Nova empresa** (nome, CPF/CNPJ, responsável).
+   Os planos PETLOVE, PETLIFE, DOGLIFE e CATLIFE já vêm cadastrados.
+3. **Libere o administrador da clínica.** Ele cria a conta no app e preenche o pedido de acesso.
+   Em **Plataforma > Liberações**, toque em **Liberar**, escolha a empresa e o perfil
+   **Administrador**. (Dá também para criar a empresa direto nessa tela.)
+4. **A equipe da clínica.** O administrador da clínica convida as pessoas em
+   **Configurações > Equipe > Convidar pessoa**; quem cria a conta com o e-mail convidado entra
+   direto, sem passar por você. Quem se cadastra sem convite cai em **Liberações** para você decidir.
+5. **Bloquear.** Em **Plataforma > Empresas**, **Suspender acesso** tira todos da empresa na hora
+   (os dados ficam guardados). Para uma pessoa só, desligue o acesso dela na mesma tela.
+6. Em **Configurações > Clínica**, o administrador ajusta horário de atendimento e intervalo.
 
 ## Parte 4: instalar o APK no Android
 
-1. No celular, abra o link do **VetCare.apk** (Releases) e baixe.
+1. No celular, abra o link do **Pontual.apk** (Releases) e baixe.
 2. Toque no arquivo baixado. O Android pede permissão para "instalar apps desta fonte":
    permita para o navegador ou gerenciador de arquivos.
 3. Instale e abra o **VetCare**.

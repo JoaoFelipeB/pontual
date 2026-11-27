@@ -299,6 +299,21 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
 .show-sm { display: none; }
 .input-group .btn { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-left: -1px; height: 38px; }
 .auth-card-inner { display: flex; flex-direction: column; gap: 14px; }
+.nav-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--red); color: #fff; font-size: .72rem; font-weight: 700; display: inline-grid; place-items: center; }
+.tab-icon { position: relative; display: inline-flex; }
+.nav-badge.dot { position: absolute; top: -6px; right: -10px; margin: 0; min-width: 16px; height: 16px; font-size: .64rem; }
+.dialog-extra { margin-top: 12px; }
+.req-list { list-style: none; margin: 0; padding: 0; }
+.req { display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px; border-top: 1px solid var(--border); }
+.req:first-child { border-top: 0; }
+.req-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.req-main small { color: var(--text-3); font-size: .82rem; }
+.req-hint { font-size: .88rem; }
+.req-msg { font-size: .88rem; color: var(--text-2); font-style: italic; }
+.req-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.suspend-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.suspend-row b { display: block; }
+.suspend-row small { display: block; font-size: .84rem; }
 .settings-card .form-section { padding: 0 18px 18px; }
 
 /* ------------------------------------------------------------ overlays */
@@ -453,6 +468,9 @@ textarea.input { height: auto; padding: 9px 11px; resize: vertical; line-height:
   .detail-actions .spacer { display: none; }
   .history button { flex-wrap: wrap; }
   .history .grow { flex-basis: calc(100% - 100px); }
+  .req { flex-wrap: wrap; padding: 14px; }
+  .req-actions { width: 100%; justify-content: flex-start; padding-left: 48px; }
+  .suspend-row { flex-direction: column; align-items: flex-start; }
   .card { overflow-x: auto; }
   .tl-row.is-past { display: none; }
   .kpis { gap: 10px; }

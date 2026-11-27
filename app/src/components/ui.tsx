@@ -80,9 +80,9 @@ export function Drawer({ open, onClose, title, children, footer, wide }: {
   );
 }
 
-export function Confirm({ open, title, text, confirmLabel, danger, onConfirm, onCancel, busy }: {
+export function Confirm({ open, title, text, confirmLabel, danger, onConfirm, onCancel, busy, children }: {
   open: boolean; title: string; text: string; confirmLabel: string; danger?: boolean;
-  onConfirm: () => void; onCancel: () => void; busy?: boolean;
+  onConfirm: () => void; onCancel: () => void; busy?: boolean; children?: ReactNode;
 }) {
   useEscape(open, onCancel);
   if (!open) return null;
@@ -91,6 +91,7 @@ export function Confirm({ open, title, text, confirmLabel, danger, onConfirm, on
       <div className="dialog" role="alertdialog" aria-modal="true">
         <h2>{title}</h2>
         <p>{text}</p>
+        {children && <div className="dialog-extra">{children}</div>}
         <div className="dialog-actions">
           <Button onClick={onCancel}>Voltar</Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>{confirmLabel}</Button>

@@ -1,4 +1,4 @@
-# VetCare
+# Pontual - Sistema para Clínicas
 
 Agenda e prontuário para clínicas veterinárias: app Android (APK), versão web e banco de
 dados na nuvem com login e perfis de acesso.
@@ -19,20 +19,23 @@ dados na nuvem com login e perfis de acesso.
 - **Segurança.** As tabelas têm Row Level Security ligado e nenhuma política: ninguém lê
   ou grava tabela diretamente. O app só chama as funções de `0002_api.sql`, que conferem
   usuário, clínica e perfil a cada chamada. Cada clínica só enxerga os próprios dados.
-- **Usuários.** Login do Supabase Auth (e-mail e senha). O administrador convida pelo
-  e-mail; quando a pessoa cria a conta com esse e-mail, um gatilho a liga à clínica com
-  o perfil escolhido.
+- **Usuários e liberação.** Login do Supabase Auth (e-mail e senha). Criar conta não dá
+  acesso: a pessoa pede acesso e o **dono da plataforma** (`platform_admins`) aprova,
+  escolhendo empresa e perfil, ou recusa. O administrador de uma clínica liberada pode
+  convidar a própria equipe por e-mail (o convite vale como pré-aprovação). Empresas podem
+  ser suspensas, o que bloqueia todos os seus usuários na hora. Ações da plataforma ficam em
+  `platform_audit`; ações das clínicas, em `audit_log`.
 
 ## Pastas
 
 ```
-supabase/migrations/   0001_schema.sql (tabelas)  0002_api.sql (funções e permissões)
+supabase/migrations/   0001 tabelas | 0002 funções e permissões | 0003 senha pelo admin | 0004 liberação de acesso
 app/                   React + TypeScript + Vite, empacotado como APK com Capacitor
   src/lib/             cliente Supabase, chamadas da API, sessão, formatação
   src/pages/           Painel, Agenda (dia e lista), Pacientes, Configurações, Login
   src/features/        formulário e detalhe do agendamento
   android/             projeto Android gerado pelo Capacitor (ícones e splash da marca)
-tests/                 28 testes do banco em PGlite + simulador local do Supabase
+tests/                 37 testes do banco em PGlite + simulador local do Supabase
 .github/workflows/     APK, site (GitHub Pages) e testes, automáticos a cada envio
 ```
 
@@ -53,7 +56,8 @@ Para testar o app inteiro sem Supabase, há um simulador local com dados de exem
 cd app && echo "VITE_SUPABASE_URL=http://localhost:54321" > .env && echo "VITE_SUPABASE_ANON_KEY=local" >> .env
 npm run build && cd ..
 SEED=1 node tests/fake-supabase.mjs 54321 app/dist
-# abra http://localhost:54321  |  admin@demo.com / admin12345, rec@demo.com e vet@demo.com / senha12345
+# abra http://localhost:54321  |  dono@demo.com / dono12345 (plataforma), admin@demo.com / admin12345,
+# rec@demo.com e vet@demo.com / senha12345
 ```
 
 ## Erros da API

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { CalendarDays, CalendarPlus, KeyRound, LayoutDashboard, LogOut, PawPrint, Settings } from 'lucide-react';
+import { CalendarDays, CalendarPlus, KeyRound, LayoutDashboard, LogOut, PawPrint, Settings, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { initials, ROLE_LABEL } from '../lib/format';
@@ -24,7 +24,8 @@ const NAV = [
   { to: '/painel', label: 'Painel', icon: LayoutDashboard, perm: 'reports.read' },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays, perm: 'agenda.read' },
   { to: '/pacientes', label: 'Pacientes', icon: PawPrint, perm: 'patients.read' },
-  { to: '/configuracoes', label: 'Configurações', icon: Settings, perm: 'settings.manage' }
+  { to: '/configuracoes', label: 'Configurações', icon: Settings, perm: 'settings.manage' },
+  { to: '/plataforma', label: 'Plataforma', icon: ShieldCheck, perm: 'platform' }
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -34,7 +35,9 @@ export function Layout({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState(0);
   const [pwOpen, setPwOpen] = useState(false);
   const loc = useLocation();
-  const nav = NAV.filter((n) => can(n.perm));
+  const nav = NAV.filter((n) => (n.perm === 'platform' ? !!boot?.platform_admin : can(n.perm)));
+  const pending = boot?.pending_requests ?? 0;
+  const member = boot?.member ?? null;
   const current = NAV.find((n) => loc.pathname.startsWith(n.to));
 
   const ws: Workspace = {
@@ -45,16 +48,16 @@ export function Layout({ children }: { children: ReactNode }) {
     changed: () => setVersion((v) => v + 1)
   };
 
-  if (!boot?.member) return null;
+  if (!boot || (!boot.member && !boot.platform_admin)) return null;
   return (
     <WorkspaceCtx.Provider value={ws}>
       <div className="shell">
         <aside className="sidebar">
           <div className="sidebar-brand">
             <img src="logo.svg" alt="" width={34} height={34} />
-            <div><b>Pontual</b><small>{boot.clinic.name}</small></div>
+            <div><b>Pontual</b><small>{member ? boot.clinic.name : 'Administração da plataforma'}</small></div>
           </div>
-          {can('agenda.write') && (
+          {member && can('agenda.write') && (
             <Button variant="primary" className="sidebar-cta" icon={<CalendarPlus size={17} />} onClick={() => ws.openNew()}>
               Novo agendamento
             </Button>
@@ -63,12 +66,13 @@ export function Layout({ children }: { children: ReactNode }) {
             {nav.map((n) => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`}>
                 <n.icon size={18} strokeWidth={1.8} /><span>{n.label}</span>
+                {n.perm === 'platform' && pending > 0 && <span className="nav-badge" aria-label={`${pending} pedidos pendentes`}>{pending}</span>}
               </NavLink>
             ))}
           </nav>
           <div className="sidebar-user">
-            <span className="avatar">{initials(boot.member.name)}</span>
-            <div className="sidebar-user-text"><b>{boot.member.name}</b><small>{ROLE_LABEL[boot.member.role]}</small></div>
+            <span className="avatar">{initials(member?.name ?? boot.user.email)}</span>
+            <div className="sidebar-user-text"><b>{member?.name ?? boot.user.email}</b><small>{member ? ROLE_LABEL[member.role] : 'Dono da plataforma'}</small></div>
             <button className="icon-btn" onClick={() => setPwOpen(true)} aria-label="Trocar senha" title="Trocar senha"><KeyRound size={17} /></button>
             <button className="icon-btn" onClick={signOut} aria-label="Sair" title="Sair"><LogOut size={17} /></button>
           </div>
@@ -90,25 +94,26 @@ export function Layout({ children }: { children: ReactNode }) {
               <n.icon size={21} strokeWidth={1.8} /><span>{n.label}</span>
             </NavLink>
           ))}
-          {can('agenda.write') && (
+          {member && can('agenda.write') && (
             <button className="tab tab-cta" onClick={() => ws.openNew()} aria-label="Novo agendamento">
               <span className="tab-cta-icon"><CalendarPlus size={21} /></span><span>Agendar</span>
             </button>
           )}
           {nav.slice(2).map((n) => (
             <NavLink key={n.to} to={n.to} className={({ isActive }) => `tab ${isActive ? 'is-active' : ''}`}>
-              <n.icon size={21} strokeWidth={1.8} /><span>{n.label === 'Configurações' ? 'Ajustes' : n.label}</span>
+              <span className="tab-icon"><n.icon size={21} strokeWidth={1.8} />{n.perm === 'platform' && pending > 0 && <span className="nav-badge dot">{pending}</span>}</span>
+              <span>{n.label === 'Configurações' ? 'Ajustes' : n.label}</span>
             </NavLink>
           ))}
         </nav>
       </div>
 
-      <AppointmentForm
+      {member && <AppointmentForm
         open={form.open} edit={form.edit} preset={form.preset}
         onClose={() => setForm({ open: false })}
         onSaved={(a) => { setForm({ open: false }); ws.changed(); setDetail(a.id); }}
-      />
-      <AppointmentDetail id={detail} onClose={() => setDetail(null)} />
+      />}
+      {member && <AppointmentDetail id={detail} onClose={() => setDetail(null)} />}
       <ChangePassword open={pwOpen} onClose={() => setPwOpen(false)} />
     </WorkspaceCtx.Provider>
   );

@@ -7,6 +7,9 @@ let admin: ReturnType<typeof client>;
 let rec: ReturnType<typeof client>;
 let vet: ReturnType<typeof client>;
 let other: ReturnType<typeof client>;
+let owner: ReturnType<typeof client>;
+let clinicId: string;
+let otherClinicId: string;
 let today: string;
 let vetId: string;
 
@@ -33,10 +36,25 @@ async function expectError(p: Promise<unknown>, code: string) {
   throw new Error(`expected ${code}`);
 }
 
+/** New user asks for access and the platform owner approves it into a company. */
+async function onboard(email: string, name: string, companyId: string, role = 'admin') {
+  const c = client(db, await signUp(db, email));
+  await c('request_access', { p_name: name, p_phone: '83999990000', p_company_hint: 'Clínica' });
+  const req = (await owner('platform_list_requests', { p_status: 'pending' })).find((r: any) => r.email === email);
+  await owner('platform_decide_request', { p_id: req.id, p_approve: true, p_clinic_id: companyId, p_role: role });
+  return c;
+}
+
 beforeAll(async () => {
   db = await freshDb();
-  admin = client(db, await signUp(db, 'admin@clinica.com'));
-  const boot = await admin('create_clinic', { p_clinic_name: 'Clínica Amigo Fiel', p_your_name: 'Ana Souza' });
+  const ownerId = await signUp(db, 'dono@pontual.com');
+  await db.query('insert into public.platform_admins (user_id) values ($1)', [ownerId]);
+  owner = client(db, ownerId);
+  clinicId = (await owner('platform_save_company', { p_id: null, p: { name: 'Clínica Amigo Fiel', document: '12.345.678/0001-90' } })).id;
+  otherClinicId = (await owner('platform_save_company', { p_id: null, p: { name: 'Outra Clínica' } })).id;
+
+  admin = await onboard('admin@clinica.com', 'Ana Souza', clinicId);
+  const boot = await admin('app_bootstrap');
   today = boot.today;
 
   await admin('invite_member', { p_email: 'rec@clinica.com', p_name: 'Carla Mendes', p_role: 'recepcao' });
@@ -44,8 +62,7 @@ beforeAll(async () => {
   rec = client(db, await signUp(db, 'rec@clinica.com'));
   vet = client(db, await signUp(db, 'vet@clinica.com'));
 
-  other = client(db, await signUp(db, 'outra@clinica.com'));
-  await other('create_clinic', { p_clinic_name: 'Outra Clínica', p_your_name: 'Bruno Alves' });
+  other = await onboard('outra@clinica.com', 'Bruno Alves', otherClinicId);
 
   vetId = (await vet('app_bootstrap')).member.id;
 });
@@ -61,7 +78,7 @@ describe('acesso e onboarding', () => {
     await db.exec('reset role');
   });
 
-  it('primeiro acesso: cria a clínica com os 4 planos e vira admin', async () => {
+  it('empresa criada pelo dono já vem com os 4 planos; aprovado como admin', async () => {
     const b = await admin('app_bootstrap');
     expect(b.member.role).toBe('admin');
     expect(b.plans.map((p: any) => p.code).sort()).toEqual(['CATLIFE', 'DOGLIFE', 'PETLIFE', 'PETLOVE']);
@@ -79,6 +96,11 @@ describe('acesso e onboarding', () => {
     const stranger = client(db, await signUp(db, 'curioso@gmail.com'));
     expect((await stranger('app_bootstrap')).member).toBeNull();
     await expectError(stranger('list_appointments'), 'VC401');
+  });
+
+  it('não existe mais criar clínica por conta própria', async () => {
+    const stranger = client(db, await signUp(db, 'espertinho@gmail.com'));
+    await expectError(stranger('create_clinic', { p_clinic_name: 'Minha', p_your_name: 'Fulano' }), '42883');
   });
 
   it('convidar quem já tem conta liga na hora', async () => {
@@ -196,6 +218,71 @@ describe('agenda', () => {
     const a = await rec('save_appointment', { p_id: null, p: appt({ time: '17:00' }) });
     await expectError(rec('delete_appointment', { p_id: a.id }), 'VC403');
     expect((await admin('delete_appointment', { p_id: a.id })).deleted).toBe(true);
+  });
+});
+
+describe('liberação de acesso pela plataforma', () => {
+  let pedro: ReturnType<typeof client>;
+
+  it('Pedro cria conta: sem liberação não vê nada e pede acesso', async () => {
+    pedro = client(db, await signUp(db, 'pedro@gmail.com'));
+    const b = await pedro('app_bootstrap');
+    expect(b).toMatchObject({ member: null, platform_admin: false, access_request: null });
+    expect(Object.keys((await expectError(pedro('request_access', { p_name: 'P', p_phone: '1', p_company_hint: '' }), 'VC422')).fields))
+      .toEqual(expect.arrayContaining(['name', 'phone', 'company_hint']));
+    const after = await pedro('request_access', { p_name: 'Pedro Henrique', p_phone: '(83) 98765-4321', p_company_hint: 'Amigo Fiel' });
+    expect(after.access_request.status).toBe('pending');
+    await expectError(pedro('request_access', { p_name: 'Pedro Henrique', p_phone: '83987654321', p_company_hint: 'Amigo Fiel' }), 'VC409');
+    await expectError(pedro('list_appointments'), 'VC401');
+  });
+
+  it('só o dono da plataforma vê e decide pedidos e empresas', async () => {
+    await expectError(admin('platform_list_requests'), 'VC403');
+    await expectError(admin('platform_list_companies'), 'VC403');
+    await expectError(pedro('platform_save_company', { p_id: null, p: { name: 'Hack' } }), 'VC403');
+    expect((await owner('app_bootstrap')).pending_requests).toBe(1);
+  });
+
+  it('dono recusa: Pedro vê o motivo e pode pedir de novo', async () => {
+    const req = (await owner('platform_list_requests', { p_status: 'pending' }))[0];
+    await owner('platform_decide_request', { p_id: req.id, p_approve: false, p_reason: 'Não reconhecemos a clínica' });
+    const b = await pedro('app_bootstrap');
+    expect(b.access_request).toMatchObject({ status: 'rejected', reject_reason: 'Não reconhecemos a clínica' });
+    expect((await pedro('request_access', { p_name: 'Pedro Henrique', p_phone: '83987654321', p_company_hint: 'Amigo Fiel, recepção' })).access_request.status).toBe('pending');
+  });
+
+  it('dono aprova na empresa e perfil escolhidos; Pedro passa a usar', async () => {
+    const req = (await owner('platform_list_requests', { p_status: 'pending' }))[0];
+    await expectError(owner('platform_decide_request', { p_id: req.id, p_approve: true, p_clinic_id: clinicId }), 'VC422');
+    await owner('platform_decide_request', { p_id: req.id, p_approve: true, p_clinic_id: clinicId, p_role: 'recepcao' });
+    await expectError(owner('platform_decide_request', { p_id: req.id, p_approve: true, p_clinic_id: clinicId, p_role: 'recepcao' }), 'VC409');
+    const b = await pedro('app_bootstrap');
+    expect(b.member).toMatchObject({ name: 'Pedro Henrique', role: 'recepcao' });
+    expect((await pedro('list_appointments')).data.length).toBeGreaterThan(0);
+  });
+
+  it('suspender a empresa bloqueia todos dela na hora; reativar devolve', async () => {
+    const c = await owner('platform_get_company', { p_id: clinicId });
+    await owner('platform_save_company', { p_id: clinicId, p: { ...c, active: false } });
+    await expectError(rec('list_appointments'), 'VC401');
+    expect((await rec('app_bootstrap')).blocked).toBe('company_suspended');
+    expect((await other('list_appointments')).data).toBeDefined(); // outras empresas seguem
+    await owner('platform_save_company', { p_id: clinicId, p: { ...c, active: true } });
+    expect((await rec('list_appointments')).data).toBeDefined();
+  });
+
+  it('dono gerencia pessoas de qualquer empresa e tudo fica auditado', async () => {
+    const c = await owner('platform_get_company', { p_id: clinicId });
+    const pedroM = c.people.find((x: any) => x.email === 'pedro@gmail.com');
+    await owner('platform_set_member', { p_member_id: pedroM.id, p_active: false });
+    await expectError(pedro('list_appointments'), 'VC401');
+    const { rows } = await db.query<{ action: string }>('select distinct action from public.platform_audit');
+    expect(rows.map((r) => r.action)).toEqual(expect.arrayContaining(['create', 'approve', 'reject', 'suspend', 'reactivate', 'update']));
+  });
+
+  it('validação de empresa: CPF/CNPJ e telefone', async () => {
+    const e = await expectError(owner('platform_save_company', { p_id: null, p: { name: 'X', document: '123', contact_phone: '1' } }), 'VC422');
+    expect(Object.keys(e.fields)).toEqual(expect.arrayContaining(['name', 'document', 'contact_phone']));
   });
 });
 

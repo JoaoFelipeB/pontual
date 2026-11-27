@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Appointment, Bootstrap, Slot, TutorDetail, TutorSummary } from './types';
+import type { Appointment, Bootstrap, Company, CompanyDetail, PlatformRequest, Slot, TutorDetail, TutorSummary } from './types';
 
 /** Error returned by the database API: message for the user + per-field messages. */
 export class ApiError extends Error {
@@ -35,8 +35,8 @@ export interface ListParams {
 
 export const api = {
   bootstrap: () => rpc<Bootstrap>('app_bootstrap'),
-  createClinic: (clinicName: string, yourName: string) =>
-    rpc<Bootstrap>('create_clinic', { p_clinic_name: clinicName, p_your_name: yourName }),
+  requestAccess: (p: { name: string; phone: string; company_hint: string; message?: string }) =>
+    rpc<Bootstrap>('request_access', { p_name: p.name, p_phone: p.phone, p_company_hint: p.company_hint, p_message: p.message ?? null }),
 
   listAppointments: (p: ListParams) =>
     rpc<{ data: Appointment[]; next_cursor: string | null }>('list_appointments', {
@@ -68,6 +68,18 @@ export const api = {
   cancelInvite: (id: string) => rpc<any>('cancel_invite', { p_id: id }),
   adminResetPassword: (memberId: string, password: string) =>
     rpc<{ ok: boolean; name: string; email: string }>('admin_reset_password', { p_member_id: memberId, p_new_password: password }),
+  // ---- platform owner
+  platformCompanies: (q = '') => rpc<Company[]>('platform_list_companies', { p_q: q }),
+  platformCompany: (id: string) => rpc<CompanyDetail>('platform_get_company', { p_id: id }),
+  platformSaveCompany: (id: string | null, p: Record<string, unknown>) => rpc<CompanyDetail>('platform_save_company', { p_id: id, p }),
+  platformSetMember: (memberId: string, role?: string, active?: boolean) =>
+    rpc<CompanyDetail>('platform_set_member', { p_member_id: memberId, p_role: role ?? null, p_active: active ?? null }),
+  platformRequests: (status: string) => rpc<PlatformRequest[]>('platform_list_requests', { p_status: status }),
+  platformDecide: (id: string, approve: boolean, opts: { clinicId?: string; role?: string; reason?: string } = {}) =>
+    rpc<PlatformRequest[]>('platform_decide_request', {
+      p_id: id, p_approve: approve, p_clinic_id: opts.clinicId ?? null, p_role: opts.role ?? null, p_reason: opts.reason ?? null
+    }),
+
   updateMember: (id: string, role?: string, active?: boolean) =>
     rpc<any>('update_member', { p_id: id, p_role: role ?? null, p_active: active ?? null })
 };

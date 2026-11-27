@@ -3,7 +3,8 @@ import { isConfigured } from './lib/supabase';
 import { SessionProvider, useSession } from './lib/session';
 import { Layout } from './components/Layout';
 import { Spinner, Toaster } from './components/ui';
-import { LoginPage, NewPasswordPage, NotConfiguredPage, OnboardingPage } from './pages/Login';
+import { AccessPage, LoginPage, NewPasswordPage, NotConfiguredPage } from './pages/Login';
+import { PlatformPage } from './pages/Platform';
 import { DashboardPage } from './pages/Dashboard';
 import { AgendaPage } from './pages/Agenda';
 import { PatientDetailPage, PatientsPage } from './pages/Patients';
@@ -18,11 +19,23 @@ function Gate() {
     <div className="boot"><div className="auth-card"><h2>Não foi possível carregar</h2><p className="muted">{error}</p>
       <button className="btn btn-primary btn-md block" onClick={refresh}>Tentar de novo</button></div></div>
   );
-  if (!boot.member) return <OnboardingPage />;
+  if (!boot.member && !boot.platform_admin) return <AccessPage />;
+  if (!boot.member) {
+    // platform owner without a clinic of their own: only the platform area
+    return (
+      <Layout>
+        <Routes>
+          <Route path="/plataforma" element={<PlatformPage />} />
+          <Route path="*" element={<Navigate to="/plataforma" replace />} />
+        </Routes>
+      </Layout>
+    );
+  }
   const home = can('reports.read') ? '/painel' : '/agenda';
   return (
     <Layout>
       <Routes>
+        {boot.platform_admin && <Route path="/plataforma" element={<PlatformPage />} />}
         <Route path="/painel" element={<DashboardPage />} />
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/pacientes" element={<PatientsPage />} />

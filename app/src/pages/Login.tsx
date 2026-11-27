@@ -3,7 +3,8 @@ import { CalendarCheck, ShieldCheck, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
-import { Button, Field, Input, Segmented, toast } from '../components/ui';
+import { Button, Field, Input, Segmented, Textarea, toast } from '../components/ui';
+import { maskPhone } from '../lib/format';
 
 const AUTH_MSG: Record<string, string> = {
   'Invalid login credentials': 'E-mail ou senha incorretos.',
@@ -62,7 +63,7 @@ export function LoginPage() {
           ) : (
             <form onSubmit={submit} noValidate>
               <h2>{mode === 'entrar' ? 'Entrar' : 'Criar conta'}</h2>
-              <p className="muted">{mode === 'entrar' ? 'Use o e-mail e a senha da sua conta.' : 'Recebeu um convite da clínica? Crie a conta com o mesmo e-mail do convite.'}</p>
+              <p className="muted">{mode === 'entrar' ? 'Use o e-mail e a senha da sua conta.' : 'Depois de criar a conta, o acesso é liberado pela administração. Recebeu convite da clínica? Use o mesmo e-mail do convite e entre direto.'}</p>
               <Segmented label="Acesso" value={mode} onChange={(v) => { setMode(v); setError(null); }}
                 options={[{ value: 'entrar', label: 'Entrar' }, { value: 'criar', label: 'Criar conta' }]} />
               <Field label="E-mail"><Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
@@ -80,46 +81,80 @@ export function LoginPage() {
   );
 }
 
-/** Signed in, but not linked to any clinic yet. */
-export function OnboardingPage() {
-  const { boot, setBoot, signOut } = useSession();
-  const [step, setStep] = useState<'choice' | 'create'>('choice');
-  const [f, setF] = useState({ clinic: '', name: '' });
+/**
+ * Signed in, but without access: request access, wait for approval, or see why it was refused/blocked.
+ * Access is granted only by the platform owner (or by a company admin's invite).
+ */
+export function AccessPage() {
+  const { boot, setBoot, refresh, signOut } = useSession();
+  const req = boot?.access_request ?? null;
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState({ name: req?.name ?? '', phone: req?.phone ?? '', company_hint: req?.company_hint ?? '', message: '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  async function create(e: React.FormEvent) {
+  async function send(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try { setBoot(await api.createClinic(f.clinic, f.name)); toast.ok('Clínica criada. Bem-vindo!'); }
+    try { setBoot(await api.requestAccess(f)); setEditing(false); setErr({}); toast.ok('Pedido enviado.'); }
     catch (x) { if (x instanceof ApiError) { setErr(x.fields); toast.error(x.message); } }
     finally { setBusy(false); }
   }
+  async function check() {
+    setChecking(true);
+    await refresh();
+    setChecking(false);
+  }
 
+  const blocked = boot?.blocked;
+  const showForm = !blocked && (editing || !req);
   return (
     <div className="auth auth-single">
       <main className="auth-main">
         <div className="auth-card">
           <div className="auth-brand"><img src="logo.svg" alt="" width={36} height={36} /><b>Pontual</b></div>
-          {step === 'choice' ? (
+          {blocked === 'company_suspended' ? (
             <>
-              <h2>Quase lá</h2>
-              <p className="muted">A conta <b>{boot?.user.email}</b> ainda não está ligada a nenhuma clínica.</p>
-              <div className="choice">
-                <button onClick={() => setStep('create')}><b>Sou o responsável pela clínica</b><small>Cadastrar a clínica e virar administrador.</small></button>
-                <div className="choice-info"><b>Faço parte de uma equipe</b><small>Peça ao administrador para convidar <b>{boot?.user.email}</b> em Configurações &gt; Equipe e entre de novo.</small></div>
-              </div>
-              <Button variant="ghost" className="block" onClick={signOut}>Sair</Button>
+              <h2>Acesso suspenso</h2>
+              <p className="muted">O acesso da sua empresa está suspenso no momento. Fale com o responsável pela clínica.</p>
+            </>
+          ) : blocked === 'member_disabled' ? (
+            <>
+              <h2>Acesso desativado</h2>
+              <p className="muted">Seu usuário foi desativado. Fale com o administrador da clínica.</p>
+            </>
+          ) : showForm ? (
+            <form onSubmit={send} noValidate>
+              <h2>Solicitar acesso</h2>
+              <p className="muted">A conta <b>{boot?.user.email}</b> foi criada, mas o acesso precisa ser liberado. Preencha os dados abaixo para pedir a liberação.</p>
+              <Field label="Seu nome completo" required error={err.name}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoComplete="name" /></Field>
+              <Field label="Telefone (WhatsApp)" required error={err.phone}><Input value={f.phone} onChange={(e) => setF({ ...f, phone: maskPhone(e.target.value) })} inputMode="tel" autoComplete="tel" /></Field>
+              <Field label="Clínica onde você trabalha" required error={err.company_hint}><Input value={f.company_hint} onChange={(e) => setF({ ...f, company_hint: e.target.value })} /></Field>
+              <Field label="Mensagem (opcional)" error={err.message}><Textarea value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} rows={2} placeholder="Ex.: sou da recepção, entrei este mês" /></Field>
+              <Button variant="primary" type="submit" loading={busy} className="block">Enviar pedido</Button>
+              {req && <Button variant="ghost" type="button" className="block" onClick={() => setEditing(false)}>Voltar</Button>}
+            </form>
+          ) : req!.status === 'rejected' ? (
+            <>
+              <h2>Pedido não aprovado</h2>
+              <p className="muted">Seu pedido de acesso não foi aprovado.{req!.reject_reason ? ` Motivo: ${req!.reject_reason}` : ''}</p>
+              <Button variant="primary" className="block" onClick={() => setEditing(true)}>Corrigir e pedir de novo</Button>
             </>
           ) : (
-            <form onSubmit={create} noValidate>
-              <h2>Cadastrar clínica</h2>
-              <Field label="Nome da clínica" required error={err.clinic_name}><Input value={f.clinic} onChange={(e) => setF({ ...f, clinic: e.target.value })} /></Field>
-              <Field label="Seu nome" required error={err.your_name}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-              <Button variant="primary" type="submit" loading={busy} className="block">Criar clínica</Button>
-              <Button variant="ghost" type="button" className="block" onClick={() => setStep('choice')}>Voltar</Button>
-            </form>
+            <>
+              <h2>Aguardando liberação</h2>
+              <p className="muted">Recebemos seu pedido em {new Date(req!.created_at).toLocaleDateString('pt-BR')}. Assim que for liberado, você entra direto. Não precisa criar outra conta.</p>
+              <dl className="dl">
+                <dt>Nome</dt><dd>{req!.name}</dd>
+                <dt>Clínica</dt><dd>{req!.company_hint}</dd>
+                <dt>Telefone</dt><dd>{req!.phone}</dd>
+              </dl>
+              <Button variant="primary" className="block" loading={checking} onClick={check}>Verificar liberação</Button>
+              <Button variant="ghost" className="block" onClick={() => setEditing(true)}>Corrigir meus dados</Button>
+            </>
           )}
+          <Button variant="ghost" className="block" onClick={signOut}>Sair</Button>
         </div>
       </main>
     </div>
